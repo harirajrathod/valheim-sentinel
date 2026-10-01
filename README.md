@@ -9,6 +9,12 @@
 
 Valheim Sentinel turns your Valheim dedicated server into an intelligent, self-monitoring, and storytelling realm. It monitors game logs in real-time, reverse-engineers binary world saves (`.db` / `.db2` / `.chunk`) to inspect clan wealth and metallurgy, orchestrates zero-downtime player-safe updates, and synthesizes authentic Norse sagas via Google Gemini AI.
 
+> [!IMPORTANT]
+> **Architecture & Hosting Compatibility:**
+> Valheim Sentinel is an **external Linux companion daemon & SRE bot**, *not* a BepInEx `.dll` game mod.
+> - **Self-Hosted Linux VPS / Dedicated Servers (Full Capabilities):** Supported natively (Hostinger, Hetzner, OVH, AWS, DigitalOcean, Ubuntu/Debian, Raspberry Pi). Requires standard SSH/shell access to run Python background services and `tmux`.
+> - **Managed Game Hosts (G-Portal, Nitrado, BisectHosting, Dathost, Shockbyte):** Managed providers lock down the game container and do not allow custom background Python processes. To use Sentinel with managed hosts, run Sentinel on any external machine (home PC/Mac, Raspberry Pi, or a low-cost VPS) and point it to your server files via SFTP mount (`rclone` or `sshfs`).
+
 ---
 
 ## ⚡ Key Capabilities
