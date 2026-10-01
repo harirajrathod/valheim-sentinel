@@ -1,0 +1,2 @@
+# Core optional dependencies (all core engine scripts use standard Python 3.8+ library)
+reportlab>=3.6.0

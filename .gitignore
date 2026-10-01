@@ -1,0 +1,72 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+config.yaml
+!config.example.yaml
+
+# Valheim Game Binaries & Saves
+valheim_server/
+valheim_server_backups/
+worlds_local/
+steamapps/
+*.db
+*.db.old
+*.fwl
+*.fwl.old
+*.so
+*.so.*
+*.x86_64
+*.acf
+
+# State files & Runtime data
+state/
+*.state.json
+valheim_player_state.json
+valheim_deaths_history.json
+valheim_active_quests.json
+valheim_bosses_defeated.json
+valheim_known_traders.json
+valheim_traders_state.json
+valheim_hildir_quests.json
+valheim_weekly_audit.json
+valheim_world_day.json
+chronicle_state.json
+
+# Logs & Runtime outputs
+*.log
+logs/
+pdf/
+*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
