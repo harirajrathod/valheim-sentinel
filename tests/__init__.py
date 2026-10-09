@@ -1,3 +1,0 @@
-"""
-Valheim Sentinel - Test Suite
-"""
