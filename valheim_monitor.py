@@ -71,6 +71,7 @@ RAID_LORE = {
     "army_theelder": ("The forest is moving... 🌲", "Greydwarf Horde & Brutes"),
     "army_bonemass": ("A foul smell from the swamp... ☣️", "Skeletons & Blobs"),
     "army_moder": ("A cold wind blows from the mountain... ❄️", "Drakes"),
+    "army_goblin": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
     "army_yagluth": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
     "army_queen": ("They sought you out... 🪲", "Seekers & Brood"),
     "army_fader": ("The Charred march... 🔥", "Ashlands Legion"),
@@ -78,7 +79,8 @@ RAID_LORE = {
     "skeletons": ("Skeleton Surprise! 💀", "Skeleton Army"),
     "foresttrolls": ("The ground is shaking... 🧌", "Trolls"),
     "surtlings": ("A smell of sulfur in the air... 🔥", "Surtlings"),
-    "bats": ("You stirred the cauldron... 🦇", "Bat Swarm")
+    "bats": ("You stirred the cauldron... 🦇", "Bat Swarm"),
+    "ghosts": ("A cold chill runs down your spine... 👻", "Spectres & Wraiths")
 }
 
 RAID_SPAWN_DURATIONS = {
@@ -86,6 +88,7 @@ RAID_SPAWN_DURATIONS = {
     "army_theelder": 120,
     "army_bonemass": 120,
     "army_moder": 120,
+    "army_goblin": 120,
     "army_yagluth": 120,
     "army_queen": 120,
     "army_fader": 150,
@@ -93,7 +96,8 @@ RAID_SPAWN_DURATIONS = {
     "skeletons": 120,
     "foresttrolls": 80,
     "surtlings": 120,
-    "bats": 120
+    "bats": 120,
+    "ghosts": 120
 }
 RAID_DURATIONS = RAID_SPAWN_DURATIONS
 MOPUP_BUFFER = 120
@@ -117,6 +121,7 @@ BOSS_STATE_FILE     = "/root/valheim_bosses_defeated.json"
 LAST_RAID_FILE      = "/root/valheim_last_raid.json"
 DEATHS_HISTORY_FILE = "/root/valheim_deaths_history.json"
 PLAYER_STATE_FILE   = "/root/valheim_player_state.json"
+ACTIVE_SESSIONS_FILE = "/root/valheim_active_sessions.json"
 TRADER_STATE_FILE   = "/root/valheim_known_traders.json"
 HILDIR_STATE_FILE   = "/root/valheim_hildir_quests.json"
 
@@ -163,6 +168,40 @@ def save_player_state(name: str, summary: Dict[str, Any]) -> None:
     states = load_player_states()
     states[name] = summary
     atomic_save_json(PLAYER_STATE_FILE, states)
+
+
+def load_active_sessions() -> Dict[str, Any]:
+    return safe_load_json(ACTIVE_SESSIONS_FILE, default={})
+
+
+def save_active_sessions(
+    sessions: Dict[str, Dict[str, Any]],
+    active: Set[str],
+    n2o: Dict[str, str],
+    n2s: Dict[str, str],
+    o2n: Dict[str, str],
+    s2n: Dict[str, str]
+) -> None:
+    data: Dict[str, Any] = {
+        "active_names": sorted(list(active)),
+        "name_to_owner": dict(n2o),
+        "name_to_socket": dict(n2s),
+        "owner_to_name": dict(o2n),
+        "socket_to_name": dict(s2n),
+        "sessions": {}
+    }
+    for p, s in sessions.items():
+        data["sessions"][p] = {
+            "login_time": s.get("login_time", time.time()),
+            "deaths": list(s.get("deaths", [])),
+            "corpse_runs": s.get("corpse_runs", 0),
+            "raids_participated": sorted(list(s.get("raids_participated", set()))),
+            "raids_died_in": sorted(list(s.get("raids_died_in", set()))),
+            "bosses_defeated": sorted(list(s.get("bosses_defeated", set()))),
+            "locations_discovered": sorted(list(s.get("locations_discovered", set()))),
+            "sea_voyage": bool(s.get("sea_voyage", False))
+        }
+    atomic_save_json(ACTIVE_SESSIONS_FILE, data)
 
 
 def get_active_join_code() -> str:
@@ -488,16 +527,46 @@ def monitor() -> None:
     socket_to_name: Dict[str, str] = {}
     last_id_seen: Optional[str] = None
 
+    # Load previously cached active sessions across monitor restarts/deployments
+    cached_data = load_active_sessions()
+    cached_sessions = cached_data.get("sessions", {})
+    if cached_data.get("owner_to_name"):
+        owner_to_name.update(cached_data["owner_to_name"])
+    if cached_data.get("name_to_owner"):
+        name_to_owner.update(cached_data["name_to_owner"])
+    if cached_data.get("socket_to_name"):
+        socket_to_name.update(cached_data["socket_to_name"])
+    if cached_data.get("name_to_socket"):
+        name_to_socket.update(cached_data["name_to_socket"])
+
     # Pre-seed active players from recent server log state
     try:
         import valheim_whatsapp_action
         srv_info = valheim_whatsapp_action.get_server_info()
-        if srv_info.get("players"):
-            for p in srv_info["players"]:
+        online_players = srv_info.get("players", [])
+        if online_players:
+            for p in online_players:
                 active_names.add(p)
-                if p not in active_sessions:
+                if p in cached_sessions:
+                    cs = cached_sessions[p]
                     active_sessions[p] = {
-                        "login_time": time.time(),
+                        "login_time": cs.get("login_time", time.time()),
+                        "deaths": list(cs.get("deaths", [])),
+                        "corpse_runs": cs.get("corpse_runs", 0),
+                        "raids_participated": set(cs.get("raids_participated", [])),
+                        "raids_died_in": set(cs.get("raids_died_in", [])),
+                        "bosses_defeated": set(cs.get("bosses_defeated", [])),
+                        "locations_discovered": set(cs.get("locations_discovered", [])),
+                        "sea_voyage": bool(cs.get("sea_voyage", False))
+                    }
+                elif p not in active_sessions:
+                    p_dur_mins = 0
+                    for ps in srv_info.get("player_sessions", []):
+                        if ps.get("name") == p:
+                            p_dur_mins = ps.get("duration_mins", 0)
+                            break
+                    active_sessions[p] = {
+                        "login_time": time.time() - (p_dur_mins * 60),
                         "deaths": [],
                         "corpse_runs": 0,
                         "raids_participated": set(),
@@ -577,7 +646,7 @@ def monitor() -> None:
     save_re         = re.compile(r"World save \(\d+/\d+\)")
     loc_re          = re.compile(r"Placed location (\w+) in zone (-?\d+),(-?\d+)")
 
-    def handle_leave(name: str, reason: str = "") -> None:
+    def handle_leave(name: str, reason: str = "", announce: bool = True) -> None:
         if name not in active_names:
             return
         active_names.remove(name)
@@ -600,6 +669,12 @@ def monitor() -> None:
             "sea_voyage": False
         }
 
+        # Keep active sessions cache in sync
+        try:
+            save_active_sessions(active_sessions, active_names, name_to_owner, name_to_socket, owner_to_name, socket_to_name)
+        except Exception:
+            pass
+
         event_type, event_detail, dur_mins, deaths_count = classify_session_event(sess, reason, now_t)
 
         summary = {
@@ -610,6 +685,12 @@ def monitor() -> None:
             "deaths_count": deaths_count,
             "exit_reason": reason
         }
+
+        # Guard: If silent or service shutdown or zero flush, do NOT broadcast and do not overwrite player state
+        if not announce or reason in ("service_shutdown", "zero_flush", "silent"):
+            print(f"Silent leave ({reason}): {name} [{event_type}] (no broadcast sent)")
+            return
+
         save_player_state(name, summary)
 
         msg_wa = get_session_leave_message(name, event_type, summary, target="whatsapp")
@@ -618,6 +699,12 @@ def monitor() -> None:
             msg_tg = get_session_leave_message(name, event_type, summary, target="telegram")
             send_telegram(msg_tg)
         send_whatsapp(msg_wa)
+        if event_type in ("RAGE_QUIT", "CORPSE_RUN_FAIL", "SEA_CASUALTY"):
+            try:
+                from valheim_voice import speak_eulogy
+                speak_eulogy(name, event_type)
+            except Exception as ve:
+                print(f"[Monitor] Voice eulogy skipped: {ve}", file=sys.stderr)
 
     def check_raid_completion(now_t: float, force: bool = False) -> None:
         nonlocal active_raid, last_completed_raid
@@ -634,6 +721,11 @@ def monitor() -> None:
             msg = format_raid_victory_message(key, defenders, sacrifices, duration_seconds=dur)
             print(f"Raid victory shout triggered: {key} (defenders: {defenders}, sacrifices: {sacrifices}, duration: {dur}s)")
             send_whatsapp(msg)
+            try:
+                from valheim_voice import speak_raid_victory
+                speak_raid_victory(key, flawless=(len(sacrifices) == 0), defenders=list(defenders))
+            except Exception as ve:
+                print(f"[Monitor] Voice raid victory skipped: {ve}", file=sys.stderr)
 
             last_completed_raid = {
                 "key": key,
@@ -653,12 +745,14 @@ def monitor() -> None:
     # Handle clean termination
     def shutdown_handler(signum: int, frame: Any) -> None:
         print(f"Shutting down Valheim monitor cleanly on signal {signum}...")
-        now_t = time.time()
-        for p in list(active_names):
-            try:
-                handle_leave(p, reason="service_shutdown")
-            except Exception:
-                pass
+        try:
+            save_active_sessions(active_sessions, active_names, name_to_owner, name_to_socket, owner_to_name, socket_to_name)
+        except Exception as e:
+            print(f"Error persisting active sessions on shutdown: {e}")
+
+        # NOTE: Do NOT call handle_leave here! Valheim monitor service restarts/deployments
+        # are daemon lifecycle events, not in-game player departures.
+
         if active_raid:
             save_raid_state(True, {"active_raid": active_raid})
         sys.exit(0)
@@ -693,6 +787,11 @@ def monitor() -> None:
                 owner_to_name.clear()
                 socket_to_name.clear()
                 last_id_seen = None
+                try:
+                    if os.path.exists(ACTIVE_SESSIONS_FILE):
+                        os.remove(ACTIVE_SESSIONS_FILE)
+                except Exception:
+                    pass
             else:
                 time.sleep(1)
             continue
@@ -715,13 +814,14 @@ def monitor() -> None:
                 if last_id_seen:
                     name_to_socket[name] = last_id_seen
                     socket_to_name[last_id_seen] = name
+                    last_id_seen = None
 
                 if name not in active_names:
                     active_names.add(name)
                     last_states = load_player_states()
                     last_state = last_states.get(name)
                     join_msg_wa = get_session_resume_message(name, last_state, target="whatsapp")
-                    print(f"Join: {name} (owner={owner}, sid={last_id_seen}) => {join_msg_wa}")
+                    print(f"Join: {name} (owner={owner}, sid={name_to_socket.get(name)}) => {join_msg_wa}")
                     if ENABLE_TELEGRAM:
                         join_msg_tg = get_session_resume_message(name, last_state, target="telegram")
                         send_telegram(join_msg_tg)
@@ -737,6 +837,10 @@ def monitor() -> None:
                         "locations_discovered": set(),
                         "sea_voyage": False
                     }
+                try:
+                    save_active_sessions(active_sessions, active_names, name_to_owner, name_to_socket, owner_to_name, socket_to_name)
+                except Exception:
+                    pass
 
                 if active_raid:
                     active_raid["defenders"].add(name)
@@ -833,8 +937,17 @@ def monitor() -> None:
         # Zero connections sanity flush
         m_zero = zero_re.search(line)
         if m_zero and active_names:
+            try:
+                import valheim_whatsapp_action
+                srv = valheim_whatsapp_action.get_server_info()
+                if srv.get("player_count", 0) > 0:
+                    print(f"[Monitor] zero_re matched '{line.strip()}', but server reports {srv['player_count']} online {srv.get('players')}. Suppressing false eviction.")
+                    continue
+            except Exception as e:
+                print(f"[Monitor] Error verifying active count on zero_re: {e}")
+
             for name in list(active_names):
-                handle_leave(name, reason="zero_flush")
+                handle_leave(name, reason="zero_flush", announce=False)
 
         # Horn of War: Random Event / Raid Alert
         m_raid = raid_re.search(line)
@@ -854,6 +967,11 @@ def monitor() -> None:
                 msg = format_raid_alert(raid_key, active_names, jcode)
                 print(f"Raid alert triggered: {raid_key} (defenders: {active_names})")
                 send_whatsapp(msg)
+                try:
+                    from valheim_voice import speak_raid_alert
+                    speak_raid_alert(raid_key, list(active_names))
+                except Exception as ve:
+                    print(f"[Monitor] Voice raid alert skipped: {ve}", file=sys.stderr)
 
                 spawn_dur = RAID_SPAWN_DURATIONS.get(raid_key, 120)
                 nominal_dur = spawn_dur + MOPUP_BUFFER
@@ -894,6 +1012,11 @@ def monitor() -> None:
                 msg = handle_boss_defeat(boss_key, active_names)
                 print(f"Boss defeat triggered (log): {boss_key}")
                 send_whatsapp(msg)
+                try:
+                    from valheim_voice import speak_boss_defeat
+                    speak_boss_defeat(boss_key, list(active_names))
+                except Exception as ve:
+                    print(f"[Monitor] Voice boss defeat proclamation skipped: {ve}", file=sys.stderr)
             continue
 
         # Location / Dungeon Discovery & Sea Voyage Detection
@@ -925,6 +1048,11 @@ def monitor() -> None:
                         msg = f"{icon} *[Realm Discovery]* {msg_text} (Found by *{finder}*)"
                         print(f"POI discovered: {loc_name}")
                         send_whatsapp(msg)
+                        try:
+                            from valheim_voice import speak_poi_discovery
+                            speak_poi_discovery(poi_key, finder)
+                        except Exception as ve:
+                            print(f"[Monitor] Voice POI discovery skipped: {ve}", file=sys.stderr)
                     break
 
             # Real-Time Trader Discovery Alert
@@ -940,6 +1068,11 @@ def monitor() -> None:
                 )
                 print(f"Trader discovered: {loc_name}")
                 send_whatsapp(msg)
+                try:
+                    from valheim_voice import speak_discovery
+                    speak_discovery(t_name, t_biome, finder)
+                except Exception as ve:
+                    print(f"[Monitor] Voice trader discovery skipped: {ve}", file=sys.stderr)
 
         # World Save / Periodic check for boss defeat & Hildir quests in DB2
         m_save = save_re.search(line)
@@ -956,6 +1089,11 @@ def monitor() -> None:
                 msg = handle_boss_defeat(b_key, active_names)
                 print(f"Boss defeat triggered (db2): {b_key}")
                 send_whatsapp(msg)
+                try:
+                    from valheim_voice import speak_boss_defeat
+                    speak_boss_defeat(b_key, list(active_names))
+                except Exception as ve:
+                    print(f"[Monitor] Voice boss defeat proclamation skipped: {ve}", file=sys.stderr)
 
             db_hildir = get_db2_hildir_quests()
             new_hildir = db_hildir - known_hildir_quests
@@ -969,6 +1107,11 @@ def monitor() -> None:
                 )
                 print(f"Hildir quest completed: {q_key}")
                 send_whatsapp(msg)
+                try:
+                    from valheim_voice import speak_hildir_quest
+                    speak_hildir_quest(loc_title, reward)
+                except Exception as ve:
+                    print(f"[Monitor] Voice Hildir quest skipped: {ve}", file=sys.stderr)
 
             # Check for Homestead Seed Cycle completion
             try:

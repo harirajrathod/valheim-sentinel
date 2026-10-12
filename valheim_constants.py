@@ -262,8 +262,25 @@ ITEM_CATALOG = {
     'BloodgoldOre': ('Bloodgold Ore', 0, 'metal'),
     'MaliciousBlood': ('🩸 Malicious Blood', 0, 'boss_mat'),
     'IntricateKey': ('Intricate Keys', 0, 'boss_mat'),
-    'MouldIntricateKey': ('Mould: Intricate Key', 0, 'boss_mat'),
     'TrophyFimbulbringer': ('Kall Fimbulbringer Trophy', 0, 'boss_mat'),
+    # Ammunition & Arrows
+    'ArrowWood': ('Wood Arrows', 0, 'arrow'),
+    'ArrowFlint': ('Flinthead Arrows', 0, 'arrow'),
+    'ArrowFire': ('Fire Arrows', 0, 'arrow'),
+    'ArrowBronze': ('Bronzehead Arrows', 0, 'arrow'),
+    'ArrowIron': ('Ironhead Arrows', 0, 'arrow'),
+    'ArrowSilver': ('Silver Arrows', 0, 'arrow'),
+    'ArrowObsidian': ('Obsidian Arrows', 0, 'arrow'),
+    'ArrowPoison': ('Poison Arrows', 0, 'arrow'),
+    'ArrowFrost': ('Frost Arrows', 0, 'arrow'),
+    'ArrowNeedle': ('Needle Arrows', 0, 'arrow'),
+    'ArrowCarapace': ('Carapace Arrows', 0, 'arrow'),
+    'ArrowBone': ('Bone Arrows', 0, 'arrow'),
+    'ArrowCharred': ('Charred Arrows', 0, 'arrow'),
+    'OozeBomb': ('Ooze Bombs', 0, 'weapon'),
+    'Bilebomb': ('Bilebombs', 0, 'weapon'),
+    'FishingBait': ('Fishing Bait', 0, 'tool'),
+    'BarleyWine': ('Fire Resistance Barley Wine', 0, 'potion'),
 }
 
 HASH_TO_KEY = {get_stable_hash(k): k for k in ITEM_CATALOG}

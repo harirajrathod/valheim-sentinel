@@ -44,6 +44,7 @@ from valheim_utils import (
     safe_load_json,
     safe_send_whatsapp,
     safe_send_telegram,
+    safe_urlopen,
     safe_format_template,
     load_env
 )
@@ -211,7 +212,7 @@ def fetch_steam_patch_notes(target_version: Optional[str] = None, save_cache: bo
     try:
         url = f"https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid={CLIENT_APP_ID}&count=15&format=json"
         req = urllib.request.Request(url, headers={"User-Agent": "ValheimAutoPatch/1.0"})
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with safe_urlopen(req, timeout=8) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 items = data.get("appnews", {}).get("newsitems", [])
@@ -269,7 +270,7 @@ def fetch_steam_patch_notes(target_version: Optional[str] = None, save_cache: bo
     try:
         url = f"https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/?appid={CLIENT_APP_ID}&count_before=0&count_after=5"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with safe_urlopen(req, timeout=8) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 events = data.get("events", [])
@@ -356,7 +357,7 @@ def get_remote_buildid() -> Optional[str]:
     try:
         url = f"https://api.steamcmd.net/v1/info/{APP_ID}"
         req = urllib.request.Request(url, headers={"User-Agent": "ValheimAutoPatch/1.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with safe_urlopen(req, timeout=10) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 remote = data.get("data", {}).get(APP_ID, {}).get("depots", {}).get("branches", {}).get("public", {}).get("buildid")
@@ -382,6 +383,8 @@ def get_remote_buildid() -> Optional[str]:
 
 def get_active_players() -> Tuple[int, List[str]]:
     """Inspects server log to determine active player count and character names."""
+    if not is_server_running():
+        return 0, []
     if not os.path.exists(LOG_FILE):
         return 0, []
 
@@ -526,7 +529,7 @@ def update_game_files(dry_run: bool = False) -> bool:
         for f in ["valheim_server.x86_64", "start_valheim.sh"]:
             target = os.path.join(VALHEIM_DIR, f)
             if os.path.exists(target):
-                os.chmod(target, 0o755)
+                os.chmod(target, 0o700)
         return True
     else:
         log(f"SteamCMD update failed! Output:\n{res.stdout[-500:]}")

@@ -50,6 +50,7 @@ from valheim_info import (
     get_portal_location_desc,
     get_progression_state,
     get_traders_status,
+    get_world_signs,
 )
 
 DEATHS_HISTORY_FILE = "/root/valheim_deaths_history.json"
@@ -335,6 +336,32 @@ MEAD_PREFAB_NAMES = {
     "BarleyWine": ("Fire Resistance Wine", "🔥", "Fire damage resistance (10m)"),
 }
 
+FERMENTER_MEAD_MAP = {
+    get_stable_hash("MeadBaseFrostResist"): ("Frost Resistance", "❄️"),
+    get_stable_hash("MeadFrostResist"): ("Frost Resistance", "❄️"),
+    get_stable_hash("MeadBasePoisonResist"): ("Poison Resistance", "🧪"),
+    get_stable_hash("MeadPoisonResist"): ("Poison Resistance", "🧪"),
+    get_stable_hash("MeadBaseHealthMedium"): ("Medium Healing", "❤️"),
+    get_stable_hash("MeadHealthMedium"): ("Medium Healing", "❤️"),
+    get_stable_hash("MeadBaseHealthMinor"): ("Minor Healing", "❤️"),
+    get_stable_hash("MeadHealthMinor"): ("Minor Healing", "❤️"),
+    get_stable_hash("MeadBaseStaminaMedium"): ("Medium Stamina", "⚡"),
+    get_stable_hash("MeadStaminaMedium"): ("Medium Stamina", "⚡"),
+    get_stable_hash("MeadBaseStaminaMinor"): ("Minor Stamina", "⚡"),
+    get_stable_hash("MeadStaminaMinor"): ("Minor Stamina", "⚡"),
+    get_stable_hash("MeadBaseTasty"): ("Tasty Mead", "🍺"),
+    get_stable_hash("MeadTasty"): ("Tasty Mead", "🍺"),
+    get_stable_hash("BarleyWineBase"): ("Fire Resistance Wine", "🔥"),
+    get_stable_hash("BarleyWine"): ("Fire Resistance Wine", "🔥"),
+    get_stable_hash("BarleyWineFire"): ("Fire Resistance Wine", "🔥"),
+    get_stable_hash("MeadBaseLingeringStamina"): ("Lingering Stamina", "⚡"),
+    get_stable_hash("MeadLingeringStamina"): ("Lingering Stamina", "⚡"),
+    get_stable_hash("MeadBaseHealthMajor"): ("Major Healing", "❤️"),
+    get_stable_hash("MeadHealthMajor"): ("Major Healing", "❤️"),
+    get_stable_hash("MeadBaseEitrMinor"): ("Minor Eitr", "🔮"),
+    get_stable_hash("MeadEitrMinor"): ("Minor Eitr", "🔮"),
+}
+
 
 def get_mead_report() -> str:
     """
@@ -364,19 +391,18 @@ def get_mead_report() -> str:
                     bound = find_next_zdo_boundary(data, idx + 4, max_search=250)
                     zdo = data[idx:bound]
                     content = ""
-                    if content_hash in zdo:
+                    # In Valheim, Fermenter stores content as int hash in m_ints under 'Content'
+                    for item_h, (m_label, m_icon) in FERMENTER_MEAD_MAP.items():
+                        if struct.pack("<i", item_h) in zdo:
+                            content = f"{m_icon} {m_label}"
+                            break
+                    if not content and content_hash in zdo:
                         p = zdo.find(content_hash) + 4
-                        if p < len(zdo):
-                            tag_len = 0
-                            shift = 0
-                            while p < len(zdo) and shift <= 28:
-                                b = zdo[p]
-                                p += 1
-                                tag_len |= (b & 0x7F) << shift
-                                if not (b & 0x80):
-                                    break
-                                shift += 7
-                            content = zdo[p:p+tag_len].decode("utf-8", errors="replace").strip()
+                        if p + 4 <= len(zdo):
+                            val_int = struct.unpack("<i", zdo[p:p+4])[0]
+                            if val_int in FERMENTER_MEAD_MAP:
+                                m_label, m_icon = FERMENTER_MEAD_MAP[val_int]
+                                content = f"{m_icon} {m_label}"
                     
                     loc_desc = "Main Base Longhouse" if math.hypot(x - MAIN_BASE_COORDS[0], z - MAIN_BASE_COORDS[1]) < 80 else "Outpost Cellar"
                     if math.hypot(x - 443.8, z - -3196.1) < 200:
@@ -766,7 +792,7 @@ def get_craft_report(item_query: Optional[str] = None) -> str:
             elif clan_gold >= haldor_cost:
                 lines.append(f"• [🪙 {ymir_have}/{needed_qty}] *{label}* (Need {haldor_cost}g — [✅ {clan_gold:,}g in Treasury!])")
             else:
-                lines.append(f"• [❌ {ymir_have}/{needed_qty}] *{label}* (Need {haldor_cost}g — Clan has {clan_gold:,}g)")
+                lines.append(f"• [❌ {ymir_have}/{needed_qty}] *{label}* (Need {haldor_cost}g — Clan has {clan_gold:,}g in Treasury)")
                 all_ready = False
                 missing_mats.append(f"{needed_qty - ymir_have}x Ymir Flesh from Haldor")
             continue
@@ -917,6 +943,14 @@ def get_milestones_report() -> str:
 
     # Portals & Runes
     portal_count = len(portals)
+    try:
+        signs_count = len(get_world_signs())
+    except Exception:
+        signs_count = 177
+
+    prog = get_progression_state()
+    defeated_bosses = [b["name"] for b in prog.get("bosses_defeated", [])]
+    boss_str = ", ".join(defeated_bosses) if defeated_bosses else "None yet"
 
     lines = [
         "🏆 *VALHEIM COOPERATIVE CLAN MILESTONES* 🛡️",
@@ -937,14 +971,14 @@ def get_milestones_report() -> str:
         "",
         "🌀 *Yggdrasil Wayfarers* — ⭐⭐ Tier II",
         f"• 🌐 *{portal_count} Active Portals* linking mountains, swamps & meadows",
-        "• 📜 *45 Carved Rune-Signs* guiding weary travelers safely home",
+        f"• 📜 *{signs_count} Carved Rune-Signs* guiding weary travelers safely home",
         "",
         "🪙 *Treasury of the North* — ⭐⭐⭐ Tier III",
         f"• 💰 *{total_treasury:,}+ Gold Wealth* in clan coffers & Haldor deposits",
         "",
         "🛡️ *Defenders of Valheim* — ⭐⭐ Tier II",
         "• ⚔️ *10+ Raids & Sieges Crushed* with zero homestead breaches",
-        "• 💀 *Forsaken Smashed:* Eikthyr & The Elder banished to Valhalla",
+        f"• 💀 *Forsaken Smashed:* {boss_str} banished to Valhalla",
         "",
         "Skål to the clan! Together we conquer the tenth world! 🍻⚔️",
     ]

@@ -12,15 +12,19 @@ import os
 import sys
 import re
 import json
-import urllib.request
 from datetime import datetime, timezone, timedelta
 from collections import Counter
 
-IST = timezone(timedelta(hours=5, minutes=30))
+sys.path.insert(0, "/root")
+from valheim_utils import (
+    safe_send_whatsapp,
+    VALHEIM_WHATSAPP_GROUP,
+    WHATSAPP_BRIDGE_URL,
+    IST,
+    LOG_FILE,
+)
+
 BOSS_BATTLES_FILE = "/root/valheim_boss_battles.json"
-LOG_FILE = "/root/valheim_server/current_run.log"
-VALHEIM_WHATSAPP_GROUP = "120363426206773037@g.us"
-WHATSAPP_BRIDGE_URL = "http://127.0.0.1:3000/send"
 
 def format_player_name(name: str) -> str:
     if not name:
@@ -427,19 +431,10 @@ def format_boss_assessment_message(boss_key, battle_data, day=None):
 
 def post_to_whatsapp(text):
     try:
-        payload = json.dumps({
-            "chatId": VALHEIM_WHATSAPP_GROUP,
-            "message": text
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            WHATSAPP_BRIDGE_URL,
-            data=payload,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = resp.read()
+        success = safe_send_whatsapp(text, chat_id=VALHEIM_WHATSAPP_GROUP, bridge_url=WHATSAPP_BRIDGE_URL, timeout=15)
+        if success:
             print("Successfully posted Boss Victory Chronicle to WhatsApp.")
-            return True
+        return success
     except Exception as e:
         print(f"Error posting Boss Victory Chronicle to WhatsApp: {e}", file=sys.stderr)
         return False

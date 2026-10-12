@@ -226,6 +226,12 @@ def get_server_info() -> Dict[str, Any]:
     if running:
         relay_ping_data = measure_relay_ping(relay_host)
         server_relay_ping_ms = relay_ping_data.get("ping_ms")
+    else:
+        players = []
+        active_players = {}
+        name_to_owner = {}
+        player_sessions = []
+        primary_zone_host = None
 
     return {
         "running": running,

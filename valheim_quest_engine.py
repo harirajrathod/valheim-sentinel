@@ -16,6 +16,9 @@ import re
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
+sys.path.insert(0, "/root")
+from valheim_utils import safe_urlopen
+
 class SafeFormatDict(dict):
     """Guards against Anti-Pattern #2 (Safe Dynamic String Formatting)."""
     def __missing__(self, key):
@@ -247,6 +250,31 @@ ITEM_BIOME_MAP = {
     "Chitin": "Ocean",
 }
 
+# Explicit Quest Opt-Out Directives (Anti-Pattern #4: Hierarchical Condition Priority)
+QUEST_OPT_OUT_PATTERNS = [
+    r"\b(?:this\s+is\s+|it(?:\x27s|\s+is)\s+)?not\s+(?:meant\s+to\s+be\s+|supposed\s+to\s+be\s+)?(?:an?\s+)?(?:clan\s+|active\s+|server\s+|in[- ]game\s+)?quest\b",
+    r"\b(?:this\s+|it\s+)?isn\x27?t\s+(?:meant\s+to\s+be\s+)?(?:an?\s+)?(?:clan\s+|active\s+)?quest\b",
+    r"\bnot\s+meant\s+(?:as|for)\s+(?:an?\s+)?quest\b",
+    r"\bnot\s+for\s+(?:an?\s+)?quest\b",
+    r"\bno\s+quest(?:s)?(?:\s+(?:needed|please|pls|bro|yaar))?\b",
+    r"\b(?:don\x27?t|do\s+not)\s+(?:make|turn|add|create|log|register|post)(?:\s+(?:it|this))?(?:\s+into|\s+as)?\s+(?:an?\s+)?quest\b",
+    r"\b(?:skip|ignore|bypass)\s+quest(?:s)?\b",
+    r"\b(?:ye|yeh|yea|isko|isse)?\s*quest\s+(?:nahi|nai)\s+hai\b",
+    r"\bquest\s+mat\s+(?:bana|banao|banana|karna|karo)\b",
+    r"\bquest\s+na\s+(?:bana|banao|banana)\b",
+    r"\bmat\s+(?:bana|banao|banana)\s+quest\b",
+]
+QUEST_OPT_OUT_REGEX = re.compile("|".join(QUEST_OPT_OUT_PATTERNS), re.IGNORECASE)
+
+def is_explicit_quest_opt_out(text: str) -> bool:
+    """
+    Checks if message explicitly requests NOT to be a quest (e.g. 'This is not a quest', 'dont make it a quest').
+    Guards against Anti-Pattern #4 (Hierarchical Condition Priority).
+    """
+    if not text or not isinstance(text, str):
+        return False
+    return bool(QUEST_OPT_OUT_REGEX.search(text))
+
 def load_api_key():
     api_key = os.environ.get("GEMINI_API_KEY")
     if api_key:
@@ -307,51 +335,60 @@ def save_quests(data):
     with open(QUESTS_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-QUEST_INTENT_SYSTEM_PROMPT = """You are the Norse Questmaster of the Valheim 10 realm (30+ Gamers clan).
-Your task is to analyze messages sent by clan leader "Hilda" in the clan WhatsApp group.
+def get_quest_intent_prompt(sender_name="Hilda"):
+    sender_name = str(sender_name or "Hilda").strip()
+    return f"""You are the Norse Questmaster of the Valheim 10 realm (30+ Gamers clan).
+Your task is to analyze messages sent by clan leader "{sender_name}" in the clan WhatsApp group.
 
 Determine if the message contains a GENUINE, EXPLICIT CALL-TO-ARMS, collective clan objective, or resource request directed at OTHER clan members.
 
 CRITICAL ANTI-SPAM & INTENT GUARDRAILS:
-You MUST return {"is_quest": false} if the message matches ANY of the following:
-1. SOLO / FIRST-PERSON INTENT: Hilda talking about what SHE personally intends to do (e.g., "I'll farm blood bags today", "I'm going to mine copper", "Will nurse seeds to 100 first", "logging on in 20 mins"). Personal tasks are NOT clan quests!
+You MUST return {{"is_quest": false}} if the message matches ANY of the following:
+0. EXPLICIT OPT-OUT OR DISCLAIMER: If the message contains ANY statement indicating it is NOT a quest (e.g., "This is not a quest", "dont make it a quest", "don't make this a quest", "not a quest", "no quest"), you MUST return {{"is_quest": false}} immediately. NEVER override the sender's explicit instruction!
+1. SOLO / FIRST-PERSON INTENT: {sender_name} talking about what THEY personally intend to do (e.g., "I'll farm blood bags today", "I'm going to mine copper", "Will nurse seeds to 100 first", "logging on in 20 mins"). Personal tasks are NOT clan quests!
 2. CASUAL CONVERSATION & BANTER: Greetings, laughs ("haha", "lol", "lmao", laughing emojis 🤣), Hinglish chatter ("arre bhai", "chalo done", "sahi hai"), or scheduling ("brb", "gn", "will join at 9").
 3. GAME THEORY & MECHANICS DISCUSSION: Comparing base designs, discussing mob stats ("golems are trolls on steroids", "double resources from 1 star boars", "making pen bigger is inefficient", "carrying 6 copper for forge"). General gaming talk is NOT a decree!
 4. META-COMMENTARY: Any mention of AI, bots, Jira, story points, project managers, or discussing previous quest notifications.
 
 WHEN TO CREATE A QUEST:
-ONLY return {"is_quest": true, ...} when Hilda is CLEARLY and INTENTIONALLY asking the clan or teammates to complete a shared objective (e.g., "Guys, can someone gather 50 bronze?", "We need everyone to stockpile wood at the mountain base before tonight", "Team, let's prep for the Elder raid").
+ONLY return {{"is_quest": true, ...}} when {sender_name} is CLEARLY and INTENTIONALLY asking the clan or teammates to complete a shared objective (e.g., "Guys, can someone gather 50 bronze?", "We need everyone to stockpile wood at the mountain base before tonight", "Team, let's prep for the Elder raid").
 
 FEW-SHOT CONTRAST EXAMPLES:
+- "This is not a quest. Today we battle moder, restock arrows, tankers be tankin, archers be archin. This is not a quest"
+  -> {{"is_quest": false}}
+- "Dont make it a quest, but guys let us collect some wood for the fire"
+  -> {{"is_quest": false}}
 - "Ok let's give the mountains meadhall a shot. Arre bhai This AI is like a over enthu project manager Har cheez ke pehle story points daal so Do 🤣🤣🤣"
-  -> {"is_quest": false}
+  -> {{"is_quest": false}}
 - "We can't use onions for food anyway I think. Will nurse the seeds to 100+ first. I'll farm blood bags today. Need to find daytime wolves."
-  -> {"is_quest": false}
+  -> {{"is_quest": false}}
 - "Wait you mean a full on base? Those guys are trolls on steroids. So when exploring we need to carry 6 copper to upgrade the forge."
-  -> {"is_quest": false}
+  -> {{"is_quest": false}}
 - "We need 1 star or 2 star boars. Double resources from 1 star. Making the pen bigger makes it inefficient."
-  -> {"is_quest": false}
+  -> {{"is_quest": false}}
 - "Guys we desperately need more bronze for armor and arrows before fighting the Elder tomorrow, can someone mine tin and copper?"
-  -> {"is_quest": true, "quest_title": "The Elder's Reckoning", "quest_type": "Metallurgy", "flavor_text": "Hilda calls upon the clan to forge bronze and craft arrows for the coming battle against the Elder.", "objectives": ["Mine copper and tin to smelt bronze", "Craft bronze armor and fire arrows"], "target_biome": "Black Forest", "bounty_reward": "Glory of Valhalla and Elder spoils", "trackable_items": {"Bronze": 30}}
+  -> {{"is_quest": true, "quest_title": "The Elder's Reckoning", "quest_type": "Metallurgy", "flavor_text": "{sender_name} calls upon the clan to forge bronze and craft arrows for the coming battle against the Elder.", "objectives": ["Mine copper and tin to smelt bronze", "Craft bronze armor and fire arrows"], "target_biome": "Black Forest", "bounty_reward": "Glory of Valhalla and Elder spoils", "trackable_items": {{"Bronze": 30}}}}
 
 If the message IS a genuine clan request, return a JSON object with this EXACT structure:
-{
+{{
   "is_quest": true,
-  "quest_title": "Epic Norse Title (e.g. The Bronze Vanguard, Feast of the Valkyrie)",
+  "quest_title": "Epic Norse Title (e.g. The Bronze Vanguard, Decree of {sender_name})",
   "quest_type": "Metallurgy" | "Homestead" | "Boss Raid" | "Pantry" | "Odyssey" | "Armoury" | "Hunting",
-  "flavor_text": "1-2 sentence dramatic Norse context explaining why Hilda calls upon the clan",
+  "flavor_text": "1-2 sentence dramatic Norse context explaining why {sender_name} calls upon the clan",
   "objectives": [
     "Clear, concise bullet point 1",
     "Clear, concise bullet point 2 (optional)"
   ],
   "target_biome": "Meadows" | "Black Forest" | "Swamp" | "Ocean" | "Mountain" | "Plains",
   "bounty_reward": "Thematic Norse reward (e.g. Glory of Valhalla + First pick of Crypt spoils)",
-  "trackable_items": {
+  "trackable_items": {{
     "ItemPrefab": target_amount_int
-  }
-}
+  }}
+}}
 
 Output ONLY the JSON object. No extra text, no markdown wrappers outside valid JSON."""
+
+QUEST_INTENT_SYSTEM_PROMPT = get_quest_intent_prompt("Hilda")
 
 def normalize_objectives(raw_objs):
     """
@@ -398,6 +435,8 @@ def call_gemini_intent(message_text, sender_name="Hilda"):
     if not api_key:
         return None
 
+    sender_name = str(sender_name or "Hilda").strip()
+    system_prompt = get_quest_intent_prompt(sender_name)
     models = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-flash-latest"]
     user_prompt = f"Sender: {sender_name}\nMessage: {message_text}"
 
@@ -414,7 +453,7 @@ def call_gemini_intent(message_text, sender_name="Hilda"):
             "contents": [
                 {
                     "role": "user",
-                    "parts": [{"text": f"{QUEST_INTENT_SYSTEM_PROMPT}\n\n---\nMESSAGE TO ANALYZE:\n{user_prompt}"}]
+                    "parts": [{"text": f"{system_prompt}\n\n---\nMESSAGE TO ANALYZE:\n{user_prompt}"}]
                 }
             ],
             "generationConfig": gen_config
@@ -428,7 +467,7 @@ def call_gemini_intent(message_text, sender_name="Hilda"):
 
         for attempt in range(1, 3):
             try:
-                with urllib.request.urlopen(req, timeout=12) as response:
+                with safe_urlopen(req, timeout=12) as response:
                     res_body = response.read().decode("utf-8")
                     res_json = json.loads(res_body)
                     text = res_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
@@ -450,14 +489,19 @@ def call_gemini_intent(message_text, sender_name="Hilda"):
                 time.sleep(1)
     return None
 
-def process_hilda_message(message_text, sender_name="Hilda"):
+def process_quest_message(message_text, sender_name="Hilda"):
     """
-    Analyzes message from Hilda. If actionable intent is found,
+    Analyzes message from an authorized clan leader (Hilda, Faye, etc.). If actionable intent is found,
     creates and registers a new quest, returning the formatted WhatsApp text.
     Returns None if not a quest or error.
     """
     clean_text = message_text.strip()
     if not clean_text or len(clean_text) < 5:
+        return None
+
+    sender_name = str(sender_name or "Hilda").strip()
+    if is_explicit_quest_opt_out(clean_text):
+        sys.stderr.write(f"[quest-engine] Explicit opt-out detected from {sender_name} ('not a quest'): skipping quest creation.\n")
         return None
 
     intent = call_gemini_intent(clean_text, sender_name)
@@ -468,7 +512,7 @@ def process_hilda_message(message_text, sender_name="Hilda"):
     quest_id = f"Q_{int(time.time())}"
     quest = {
         "id": quest_id,
-        "title": str(intent.get("quest_title", "Decree of the Valkyrie")).strip(),
+        "title": str(intent.get("quest_title", f"Decree of {sender_name}")).strip(),
         "type": str(intent.get("quest_type", "Homestead")).strip(),
         "issuer": sender_name,
         "issued_at": now_ist.strftime("%Y-%m-%d %H:%M:%S IST"),
@@ -503,6 +547,8 @@ def process_hilda_message(message_text, sender_name="Hilda"):
         f"🗑️ _Was this casual banter or a false alarm? Type `!drop` to discard!_"
     )
     return wa_text
+
+process_hilda_message = process_quest_message
 
 def parse_quest_line(line):
     if line is None or not isinstance(line, str):
@@ -617,20 +663,23 @@ def create_custom_quest(raw_text, issuer_name="A Viking Warrior"):
     """
     if issuer_name is None or not isinstance(issuer_name, str):
         issuer_name = str(issuer_name or "A Viking Warrior")
-    clean_iss = str(issuer_name).strip().replace("@s.whatsapp.net", "").replace("@lid", "").replace("@g.us", "")
+    clean_iss = str(issuer_name).strip().replace("@s.whatsapp.net", "").replace("@lid", "").replace("@g.us", "").lstrip("+")
     clean_iss = re.sub(r':\d+$', '', clean_iss)
     clan_map = {
-        "919810573357": "Faye", "277592460538005": "Faye",
-        "917815011234": "Hilda", "6778179829957": "Hilda",
-        "917016862977": "Dexter", "91049112391871": "Dexter",
+        "919810573357": "Faye", "9810573357": "Faye", "277592460538005": "Faye",
+        "917815011234": "Hilda", "7815011234": "Hilda", "6778179829957": "Hilda",
+        "917016862977": "Dexter", "7016862977": "Dexter", "91049112391871": "Dexter",
         "918971274710": "Musashi(Musa Bhai)", "8971274710": "Musashi(Musa Bhai)",
     }
     if clean_iss in clan_map:
         issuer_name = clan_map[clean_iss]
     elif clean_iss.isdigit() or clean_iss.startswith("12036") or clean_iss in ("Viking", "A Viking Warrior"):
-        issuer_name = "Dexter" if clean_iss in ("120363426206773037", "917016862977", "91049112391871") else "A Viking Warrior"
+        issuer_name = "Dexter" if clean_iss in ("120363426206773037", "917016862977", "91049112391871", "7016862977") else "A Viking Warrior"
     else:
         issuer_name = clean_iss
+
+    if is_explicit_quest_opt_out(raw_text):
+        return "⚠️ *[Quest Cancelled]* The decree explicitly states this is not a quest."
 
     parsed = parse_full_quest_input(raw_text)
     if not parsed:
@@ -797,7 +846,7 @@ def get_active_quests_formatted():
     ]
     for idx, q in enumerate(active, 1):
         title = q.get('title', 'Clan Quest').strip()
-        issuer = q.get('issuer', 'Hilda').strip()
+        issuer = q.get('issuer', 'Clan Leader').strip()
         issued_at = q.get('issued_at', '')
         date_str = ""
         if issued_at:
@@ -866,7 +915,7 @@ def complete_quest(index=1, completed_by="A Viking Warrior"):
         f"🎉 ⚔️ *[CLAN QUEST COMPLETED]* ⚔️ 🎉\n"
         f"═══════════════════════════════\n"
         f"🏆 *Quest:* \"{quest.get('title', 'Clan Quest')}\"\n"
-        f"👑 *Issued By:* {quest.get('issuer', 'Hilda')}\n"
+        f"👑 *Issued By:* {quest.get('issuer', 'Clan Leader')}\n"
         f"🛡️ *Fulfilled By:* {completed_by}\n"
         f"🎁 *Objective Reward Claimed:* {quest.get('bounty_reward', 'Honor of Valhalla')}\n"
         f"═══════════════════════════════\n"
@@ -1032,7 +1081,7 @@ def check_quest_inventory_completion(inventory_totals):
                     f"🎉 ⚔️ *[CLAN QUEST COMPLETED]* ⚔️ 🎉\n"
                     f"═══════════════════════════════\n"
                     f"🏆 *Quest:* \"{q.get('title', 'Clan Quest')}\"\n"
-                    f"👑 *Issued By:* {q.get('issuer', 'Hilda')}\n"
+                    f"👑 *Issued By:* {q.get('issuer', 'Clan Leader')}\n"
                     f"🛡️ *Fulfilled By:* The Clan (Vault Stockpiles Verified)\n"
                     f"🎁 *Objective Reward Claimed:* {q.get('bounty_reward', 'Honor of Valhalla')}\n"
                     f"═══════════════════════════════\n"
@@ -1083,22 +1132,44 @@ if __name__ == "__main__":
             print(create_custom_quest(msg, issuer))
         elif arg == "--process":
             # Direct processing mode for bridge.js (outputs only WhatsApp text or NO_QUEST)
-            if len(sys.argv) > 2 and sys.argv[2] == "-":
+            issuer = "Hilda"
+            text_args = []
+            i = 2
+            while i < len(sys.argv):
+                if sys.argv[i] in ("--issuer", "-i") and i + 1 < len(sys.argv):
+                    issuer = sys.argv[i + 1]
+                    i += 2
+                else:
+                    text_args.append(sys.argv[i])
+                    i += 1
+
+            if text_args and text_args[0] == "-":
                 msg = sys.stdin.read().strip()
-            elif len(sys.argv) > 2:
-                msg = "\n".join(sys.argv[2:]).strip()
+            elif text_args:
+                msg = "\n".join(text_args).strip()
             else:
                 msg = sys.stdin.read().strip()
-            res = process_hilda_message(msg, "Hilda")
+            res = process_quest_message(msg, issuer)
             if res:
                 print(res)
             else:
                 print("NO_QUEST")
         elif arg == "--test":
-            test_msg = " ".join(sys.argv[2:]) or "Guys we desperately need more bronze for armor and arrows before fighting the elder"
-            print(f"Testing message: {test_msg}")
-            res = process_hilda_message(test_msg, "Hilda")
+            issuer = "Hilda"
+            text_args = []
+            i = 2
+            while i < len(sys.argv):
+                if sys.argv[i] in ("--issuer", "-i") and i + 1 < len(sys.argv):
+                    issuer = sys.argv[i + 1]
+                    i += 2
+                else:
+                    text_args.append(sys.argv[i])
+                    i += 1
+
+            test_msg = " ".join(text_args) or "Guys we desperately need more bronze for armor and arrows before fighting the elder"
+            print(f"Testing message from {issuer}: {test_msg}")
+            res = process_quest_message(test_msg, issuer)
             print("\nResult:")
             print(res or "Ignored (Not a quest)")
     else:
-        print("Usage: valheim_quest_engine.py [--list | --create <text> [--issuer <name>] | --complete <num> [user] | --drop <num> [user] | --process <message> | --test <message>]")
+        print("Usage: valheim_quest_engine.py [--list | --create <text> [--issuer <name>] | --complete <num> [user] | --drop <num> [user] | --process <message> [--issuer <name>] | --test <message> [--issuer <name>]]")

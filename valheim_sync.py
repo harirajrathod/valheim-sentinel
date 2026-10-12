@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from valheim_utils import get_stable_hash
+from valheim_utils import get_stable_hash, safe_send_whatsapp
 """
 /root/valheim_weekly_sync.py
 Automated Weekly Valheim Exploration, Trader & Progress Synchronization Engine.
@@ -108,7 +108,7 @@ def run_weekly_sync(dry_run=False):
                 "Obsidian": obsidian
             }
             print(f"✓ Key Stockpiles Audited:")
-            print(f"  • Moder Summon (Dragon Eggs): {dragon_eggs}/3 ({'🔥 Ready' if dragon_eggs >= 3 else 'Need more'})")
+            print(f"  • Yagluth Summon (Fuling Totems): {goblin_totems}/5 ({'🔥 Ready' if goblin_totems >= 5 else 'Need more'})")
             print(f"  • Treasury: {coins} Coins, {rubies} Rubies, {amber} Amber")
             print(f"  • Metallurgy: {iron} Iron, {silver} Silver, {cop} Copper, {tin} Tin, {brz} Bronze, {obsidian} Obsidian")
 
@@ -119,13 +119,7 @@ def run_weekly_sync(dry_run=False):
                 for cmsg in completed_msgs:
                     print(f"✓ Quest Auto-Completed by Vault Stockpiles!")
                     try:
-                        import urllib.request
-                        req_data = json.dumps({
-                            "chatId": "120363426206773037@g.us",
-                            "message": cmsg
-                        }).encode("utf-8")
-                        req = urllib.request.Request("http://localhost:3000/send", data=req_data, headers={"Content-Type": "application/json"})
-                        urllib.request.urlopen(req, timeout=5)
+                        safe_send_whatsapp(cmsg)
                     except Exception as wa_err:
                         print(f"Failed to post quest completion to WhatsApp: {wa_err}")
             except Exception as q_err:
@@ -263,20 +257,23 @@ def main():
             changes.append(f"Hildir quest completed: {', '.join(sorted(list(new_hildir)))}")
 
         # 4. Check active summon tributes threshold crossing (only if boss is NOT yet slain!)
+        boss_alias_map = {
+            "defeated_dragon": {"defeated_dragon", "defeated_writhan"},
+            "defeated_queen": {"defeated_queen", "defeated_seekerking"},
+        }
         tribute_thresholds = [
             ("AncientSeed", 3, "defeated_gdking", "The Elder"),
             ("WitheredBone", 10, "defeated_bonemass", "Bonemass"),
-            ("DragonEgg", 3, "defeated_writhan", "Moder"),
+            ("DragonEgg", 3, "defeated_dragon", "Moder"),
             ("GoblinTotem", 5, "defeated_goblinking", "Yagluth"),
             ("SealbreakerFragment", 9, "defeated_queen", "The Queen"),
             ("BellFragment", 3, "defeated_fader", "Fader"),
-            ("SealbreakerFragment", 9, "defeated_seekerking", "The Queen"),
-            ("BellFragment", 3, "defeated_fader", "Fader")
         ]
         prev_stock = prev_audit.get("key_stockpiles", {})
         curr_stock = audit.get("key_stockpiles", {})
         for item_key, needed, boss_key, boss_name in tribute_thresholds:
-            if boss_key not in curr_bosses:
+            keys_to_check = boss_alias_map.get(boss_key, {boss_key})
+            if not (keys_to_check & curr_bosses):
                 prev_c = prev_stock.get(item_key, 0)
                 curr_c = curr_stock.get(item_key, 0)
                 if prev_c < needed and curr_c >= needed:

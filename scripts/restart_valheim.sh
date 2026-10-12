@@ -13,7 +13,7 @@ if [ -f "/root/valheim_server/.pending_update" ] || python3 /root/valheim_autopa
 fi
 
 # Check if players are currently online - skip restart if so
-PLAYER_COUNT=$(tmux capture-pane -t "$TMUX_SESSION" -p 2>/dev/null | grep -oP 'Connections \K[0-9]+' | tail -1)
+PLAYER_COUNT=$(python3 -c "from valheim_utils import get_valheim_player_count; print(get_valheim_player_count())" 2>/dev/null || echo "0")
 PLAYER_COUNT=${PLAYER_COUNT:-0}
 
 if [ "$PLAYER_COUNT" -gt 0 ] 2>/dev/null; then

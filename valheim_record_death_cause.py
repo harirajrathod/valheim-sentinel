@@ -26,30 +26,13 @@ PHONE_TO_PLAYER = {
     "8971274710": "Musashi",
 }
 
-def format_player_name(name):
-    if not name:
-        return ""
-    if name.strip().lower() in ("musashi", "musashi(musa bhai)", "musa bhai"):
-        return "Musashi(Musa Bhai)"
-    return name
+from valheim_utils import safe_load_json, atomic_save_json, format_player_name
 
 def load_deaths():
-    if os.path.exists(DEATHS_HISTORY_FILE):
-        try:
-            with open(DEATHS_HISTORY_FILE, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error reading deaths history: {e}", file=sys.stderr)
-    return {}
+    return safe_load_json(DEATHS_HISTORY_FILE, default={})
 
 def save_deaths(data):
-    try:
-        with open(DEATHS_HISTORY_FILE, "w") as f:
-            json.dump(data, f, indent=2)
-        return True
-    except Exception as e:
-        print(f"Error saving deaths history: {e}", file=sys.stderr)
-        return False
+    return atomic_save_json(DEATHS_HISTORY_FILE, data)
 
 def parse_iso_or_custom(ts_str):
     for fmt in ("%m/%d/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):

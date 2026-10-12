@@ -19,6 +19,7 @@ import sys
 import json
 import time
 import argparse
+import subprocess
 import urllib.request
 import urllib.error
 import re
@@ -30,6 +31,7 @@ from valheim_utils import (
     load_env,
     safe_load_json,
     atomic_save_json,
+    safe_urlopen,
     IST
 )
 
@@ -84,7 +86,7 @@ def query_gemini(prompt: str, api_key: str) -> Optional[str]:
         )
         for attempt in range(1, 3):
             try:
-                with urllib.request.urlopen(req, timeout=25) as resp:
+                with safe_urlopen(req, timeout=25) as resp:
                     res = json.loads(resp.read())
                     text = res["candidates"][0]["content"]["parts"][0]["text"]
                     return text.strip()
@@ -208,7 +210,8 @@ Strict Requirements:
     save_dynamic_roasts(current_data)
     print(f"Successfully added {added_leave} leave and {added_resume} resume roasts. Total dynamic roasts in pool: {total_dynamic}")
 
-    os.system(f'bash /root/log.sh add "Valheim Weekly Roast Refresh: Injected {added_leave + added_resume} fresh AI roasts into template pool (total dynamic: {total_dynamic})"')
+    log_msg = f"Valheim Weekly Roast Refresh: Injected {added_leave + added_resume} fresh AI roasts into template pool (total dynamic: {total_dynamic})"
+    subprocess.run(["bash", "/root/log.sh", "add", log_msg], check=False)
     return True
 
 

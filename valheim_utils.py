@@ -19,6 +19,7 @@ import tempfile
 import urllib.request
 import urllib.parse
 import urllib.error
+import subprocess
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional, Tuple
 
@@ -146,6 +147,24 @@ def atomic_save_json(file_path: str, data: Any, indent: int = 2) -> bool:
 
 # --- Messaging Dispatchers ---
 
+def safe_urlopen(
+    url_or_req: Any,
+    allowed_schemes: Tuple[str, ...] = ("http", "https"),
+    timeout: float = 10,
+    **kwargs: Any
+) -> Any:
+    """
+    Safely opens a URL or urllib.request.Request, validating that the scheme
+    is in allowed_schemes (defaults to http/https). Prevents file://, ftp://, or
+    arbitrary scheme injection (CWE-939 / CWE-22).
+    """
+    url = url_or_req.full_url if isinstance(url_or_req, urllib.request.Request) else str(url_or_req)
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme.lower() not in allowed_schemes:
+        raise ValueError(f"Disallowed URL scheme '{parsed.scheme}'; expected one of {allowed_schemes}")
+    return urllib.request.urlopen(url_or_req, timeout=timeout, **kwargs)  # nosec B310
+
+
 def safe_send_whatsapp(
     text: str,
     chat_id: str = VALHEIM_WHATSAPP_GROUP,
@@ -167,7 +186,7 @@ def safe_send_whatsapp(
     )
     for attempt in range(1, retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with safe_urlopen(req, timeout=timeout) as resp:
                 return resp.status == 200
         except Exception as e:
             if attempt >= retries:
@@ -197,7 +216,7 @@ def safe_send_telegram(
     }).encode("utf-8")
     try:
         req = urllib.request.Request(url, data=data)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with safe_urlopen(req, timeout=timeout) as resp:
             return resp.status == 200
     except Exception as e:
         sys.stderr.write(f"[valheim_utils] Telegram send error: {e}\n")
@@ -260,3 +279,55 @@ def get_active_chunk_files():
             if prefix not in chunks_by_prefix or version > chunks_by_prefix[prefix][1]:
                 chunks_by_prefix[prefix] = (c, version)
     return [v[0] for v in chunks_by_prefix.values()]
+
+
+def is_valheim_running() -> bool:
+    """Checks if the Valheim dedicated server process is active."""
+    try:
+        res = subprocess.run(["pgrep", "-f", "valheim_server.x86_64"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
+def get_valheim_player_count(log_file: str = LOG_FILE) -> int:
+    """
+    Returns the real-time active player count on the Valheim server.
+    Scans the server log backwards for the latest 'now X player(s)'
+    or 'Connections X ZDOS' status line.
+    Returns 0 if server is offline or no players connected.
+    """
+    if not is_valheim_running():
+        return 0
+    if not os.path.exists(log_file):
+        return 0
+    try:
+        with open(log_file, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            read_size = min(size, 131072)
+            f.seek(-read_size, os.SEEK_END)
+            chunk = f.read().decode("latin1", errors="ignore")
+            lines = chunk.splitlines()
+            for line in reversed(lines):
+                m_count = re.search(r'now (\d+) player\(s\)', line)
+                if m_count:
+                    return int(m_count.group(1))
+                m_conn = re.search(r'Connections (\d+) ZDOS', line)
+                if m_conn:
+                    return int(m_conn.group(1))
+
+            if size > 131072:
+                f.seek(0)
+                full_chunk = f.read().decode("latin1", errors="ignore")
+                for line in reversed(full_chunk.splitlines()):
+                    m_count = re.search(r'now (\d+) player\(s\)', line)
+                    if m_count:
+                        return int(m_count.group(1))
+                    m_conn = re.search(r'Connections (\d+) ZDOS', line)
+                    if m_conn:
+                        return int(m_conn.group(1))
+    except Exception:
+        pass
+    return 0
+

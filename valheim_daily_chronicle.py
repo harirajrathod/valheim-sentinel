@@ -42,6 +42,7 @@ RAID_LORE = {
     "army_theelder": ("The forest is moving... 🌲", "Greydwarf Horde & Brutes"),
     "army_bonemass": ("A foul smell from the swamp... ☣️", "Skeletons & Blobs"),
     "army_moder": ("A cold wind blows from the mountain... ❄️", "Drakes"),
+    "army_goblin": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
     "army_yagluth": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
     "army_queen": ("They sought you out... 🪲", "Seekers & Brood"),
     "army_fader": ("The Charred march... 🔥", "Ashlands Legion"),
@@ -50,7 +51,8 @@ RAID_LORE = {
     "skeletons": ("Skeleton Surprise! 💀", "Skeleton Army"),
     "foresttrolls": ("The ground is shaking... 🧌", "Trolls"),
     "surtlings": ("A smell of sulfur in the air... 🔥", "Surtlings"),
-    "bats": ("You stirred the cauldron... 🦇", "Bat Swarm")
+    "bats": ("You stirred the cauldron... 🦇", "Bat Swarm"),
+    "ghosts": ("A cold chill runs down your spine... 👻", "Spectres & Wraiths")
 }
 
 LOCATION_DEFS = [
@@ -1079,6 +1081,7 @@ def main():
     parser.add_argument("--post", action="store_true", help="Post chronicle directly to WhatsApp group")
     parser.add_argument("--dry-run", action="store_true", help="Print chronicle to stdout without sending")
     parser.add_argument("--hours", type=int, default=24, help="Number of hours to look back (default: 24)")
+    parser.add_argument("--no-audio", action="store_true", help="Skip sending Skald audio voice note")
     args = parser.parse_args()
     
     save_to_master = bool(args.post and not args.dry_run)
@@ -1091,6 +1094,12 @@ def main():
         
     if args.post and not args.dry_run:
         success = send_to_whatsapp(chronicle_text)
+        if success and not args.no_audio:
+            try:
+                from valheim_voice import narrate_daily_chronicle
+                narrate_daily_chronicle(chronicle_text)
+            except Exception as e:
+                print(f"[Chronicle] Note: Audio narration skipped or failed: {e}", file=sys.stderr)
         sys.exit(0 if success else 1)
 
 if __name__ == "__main__":

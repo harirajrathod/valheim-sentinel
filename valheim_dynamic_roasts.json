@@ -1,171 +1,199 @@
 {
   "RAID_CASUALTY_army_theelder": {
     "leave": [
-      "\ud83e\udea6 The elder gods weep for *{name}*, who bravely faced a horde of pinecone-throwing toddlers and lost.",
-      "\ud83e\udea6 *{name}* has been re-enlisted into the Greydwarf army, apparently they needed a new pinecone target for target practice.",
-      "\ud83e\udea6 *{name}* was utterly dismantled by a Greydwarf daycare parade and pelted to death with wet pinecones."
+      "🪦 The elder gods weep for *{name}*, who bravely faced a horde of pinecone-throwing toddlers and lost.",
+      "🪦 *{name}* has been re-enlisted into the Greydwarf army, apparently they needed a new pinecone target for target practice.",
+      "🪦 *{name}* was utterly dismantled by a Greydwarf daycare parade and pelted to death with wet pinecones.",
+      "🪦 *{name}* was beaten to a pink paste by a geriatric shrub and his army of horny wooden midgets."
     ],
     "resume": [
-      "\ud83c\udf32 Behold, *{name}* returns, still smelling faintly of sap and the crushing weight of small, furious greydwarves.",
-      "\ud83c\udf32 Behold, *{name}* has returned from their involuntary tree-hugging retreat, smelling faintly of pine needles and cowardice.",
-      "\u2694\ufe0f *{name}* has returned from the compost heap, smelling faintly of rotting mulch and crushed dreams."
+      "🌲 Behold, *{name}* returns, still smelling faintly of sap and the crushing weight of small, furious greydwarves.",
+      "🌲 Behold, *{name}* has returned from their involuntary tree-hugging retreat, smelling faintly of pine needles and cowardice.",
+      "⚔️ *{name}* has returned from the compost heap, smelling faintly of rotting mulch and crushed dreams.",
+      "🪵 *{name}* returns from Valhalla, still smelling faintly of compost and elderberry failure."
     ]
   },
   "RAID_CASUALTY_foresttrolls": {
     "leave": [
-      "\ud83e\uddcc *{name}* has been flattened into a new rug by a troll, proving that blue brutes are indeed interior decorators.",
-      "\ud83e\uddcc *{name}* has been flatter than a pancake under a troll's club, presumably now serving as a decorative floor mat for a blue brute.",
-      "\ud83e\uddcc *{name}* just got turned into blue-troll floor pasta by a naked brute wielding an entire oak tree."
+      "🧌 *{name}* has been flattened into a new rug by a troll, proving that blue brutes are indeed interior decorators.",
+      "🧌 *{name}* has been flatter than a pancake under a troll's club, presumably now serving as a decorative floor mat for a blue brute.",
+      "🧌 *{name}* just got turned into blue-troll floor pasta by a naked brute wielding an entire oak tree.",
+      "🧌 *{name}* just got turned into blue-skinned toothpaste by a blue bastard wielding an entire pine tree."
     ],
     "resume": [
-      "\ud83e\udeb5 Look, *{name}* is back, probably still seeing stars and the imprint of a tree trunk on their forehead.",
-      "\ud83c\udf33 Fear not, *{name}* is back, having miraculously un-flattened themselves and smelling suspiciously like smashed longhouse timber.",
-      "\ud83d\udd28 *{name}* is back to sweep up the splintered longhouse walls and check their pants for blue footprints."
+      "🪵 Look, *{name}* is back, probably still seeing stars and the imprint of a tree trunk on their forehead.",
+      "🌳 Fear not, *{name}* is back, having miraculously un-flattened themselves and smelling suspiciously like smashed longhouse timber.",
+      "🔨 *{name}* is back to sweep up the splintered longhouse walls and check their pants for blue footprints.",
+      "🌲 *{name}* crawls back out of the rubble, sweeping troll snot off their tunic."
     ]
   },
   "RAID_CASUALTY_wolves": {
     "leave": [
-      "\ud83d\udc3a *{name}* has joined the local wolf pack... as the main course, on a cold mountain platter.",
-      "\ud83d\udc3a *{name}* has become a vital ingredient in a wolf puppy chow recipe, proving some sacrifices are just too tasty to avoid.",
-      "\ud83d\udc3a *{name}* became crunchy freeze-dried kibble for the local mountain wolf pack."
+      "🐺 *{name}* has joined the local wolf pack... as the main course, on a cold mountain platter.",
+      "🐺 *{name}* has become a vital ingredient in a wolf puppy chow recipe, proving some sacrifices are just too tasty to avoid.",
+      "🐺 *{name}* became crunchy freeze-dried kibble for the local mountain wolf pack.",
+      "🐺 *{name}* became a chew toy for frozen fur-missiles on the mountain."
     ],
     "resume": [
-      "\u2744\ufe0f *{name}* emerges from the frost, undoubtedly still feeling the nips of a thousand tiny, hungry puppies.",
-      "\u2744\ufe0f Look who crawled back from the mountain, *{name}*! Did the wolf pups finally spit you out, or did you just run out of tasty bits?",
-      "\u2744\ufe0f *{name}* has thawed out from the snowdrift, still missing several chunks of dignity and thigh meat."
+      "❄️ *{name}* emerges from the frost, undoubtedly still feeling the nips of a thousand tiny, hungry puppies.",
+      "❄️ Look who crawled back from the mountain, *{name}*! Did the wolf pups finally spit you out, or did you just run out of tasty bits?",
+      "❄️ *{name}* has thawed out from the snowdrift, still missing several chunks of dignity and thigh meat.",
+      "🍖 *{name}* has been reassembled, minus the dignity the mountain puppies ate."
     ]
   },
   "RAID_CASUALTY_skeletons": {
     "leave": [
-      "\ud83d\udc80 *{name}* met the Skeleton Surprise and is now permanently entangled in a dance with calcium enthusiasts.",
-      "\ud83d\udc80 *{name}* has joined the Skeleton Surprise party as the guest of honor, promptly getting clobbered into calcium dust by smiling bones.",
-      "\ud83d\udc80 *{name}* got utterly humiliated and beaten to death by a calcium enthusiast with a rusty butter knife."
+      "💀 *{name}* met the Skeleton Surprise and is now permanently entangled in a dance with calcium enthusiasts.",
+      "💀 *{name}* has joined the Skeleton Surprise party as the guest of honor, promptly getting clobbered into calcium dust by smiling bones.",
+      "💀 *{name}* got utterly humiliated and beaten to death by a calcium enthusiast with a rusty butter knife.",
+      "💀 *{name}* got utterly humiliated by calcium enthusiasts who haven't eaten in three thousand years."
     ],
     "resume": [
-      "\ud83e\uddb4 *{name}* returns, likely still hearing the clatter of smiling bones in their nightmares.",
-      "\ud83e\uddb4 *{name}* returns, apparently having successfully negotiated their release from the bone zone, though still looking a bit rattled.",
-      "\ud83e\uddb4 *{name}* crawled back out of the dirt, thoroughly humbled by a pile of rattling toothpicks."
+      "🦴 *{name}* returns, likely still hearing the clatter of smiling bones in their nightmares.",
+      "🦴 *{name}* returns, apparently having successfully negotiated their release from the bone zone, though still looking a bit rattled.",
+      "🦴 *{name}* crawled back out of the dirt, thoroughly humbled by a pile of rattling toothpicks.",
+      "🦴 *{name}* is back, having successfully kicked every femur they could find out of spite."
     ]
   },
   "RAID_CASUALTY_bats": {
     "leave": [
-      "\ud83e\udd87 *{name}* stirred the Cauldron, only to be nibbled into oblivion by a thousand tiny, flapping annoyances.",
-      "\ud83e\udd87 *{name}* has been nibbled to death by a thousand tiny annoyances, proving that sometimes even the smallest foes are the most irritating.",
-      "\ud83e\udd87 *{name}* somehow managed to get nibbled to death by flying cave rats while crying in the dark."
+      "🦇 *{name}* stirred the Cauldron, only to be nibbled into oblivion by a thousand tiny, flapping annoyances.",
+      "🦇 *{name}* has been nibbled to death by a thousand tiny annoyances, proving that sometimes even the smallest foes are the most irritating.",
+      "🦇 *{name}* somehow managed to get nibbled to death by flying cave rats while crying in the dark.",
+      "🦇 *{name}* was nibbled to death in the dark by flying rats with zero tactical value."
     ],
     "resume": [
-      "\ud83c\udf11 *{name}* has escaped the cave, perhaps with a newfound phobia of anything that flutters in the dark.",
-      "\ud83c\udf11 *{name}* has emerged from the darkness, no longer a bat snack, but smelling faintly of guano and unresolved cave trauma.",
-      "\ud83d\udd6f\ufe0f *{name}* returns with zero HP and a deeply embarrassing story about being mugged by leather wings."
+      "🌑 *{name}* has escaped the cave, perhaps with a newfound phobia of anything that flutters in the dark.",
+      "🌑 *{name}* has emerged from the darkness, no longer a bat snack, but smelling faintly of guano and unresolved cave trauma.",
+      "🕯️ *{name}* returns with zero HP and a deeply embarrassing story about being mugged by leather wings.",
+      "🦇 *{name}* returns, still aggressively swatting at imaginary cave mosquitoes."
     ]
   },
   "RAID_CASUALTY_army_bonemass": {
     "leave": [
-      "\ud83e\udd22 *{name}* has become one with the Bonemass, now smelling precisely like a forgotten swamp latrine.",
-      "\ud83e\udd2e *{name}* has been absorbed into the Bonemass, now an unwilling contributor to the swamp's aroma of rotting sewage and despair.",
-      "\ud83e\udd22 *{name}* drowned in toxic green slime and now smells worse than a rotting draugr outhouse."
+      "🤢 *{name}* has become one with the Bonemass, now smelling precisely like a forgotten swamp latrine.",
+      "🤮 *{name}* has been absorbed into the Bonemass, now an unwilling contributor to the swamp's aroma of rotting sewage and despair.",
+      "🤢 *{name}* drowned in toxic green slime and now smells worse than a rotting draugr outhouse.",
+      "🦠 *{name}* drowned in toxic green slime and now smells worse than a dead bog-witch."
     ],
     "resume": [
-      "\u2623\ufe0f *{name}* squelches back, still radiating the faint, putrid aroma of toxic green goo.",
-      "\ud83e\udd22 Miraculously, *{name}* has re-materialized from the toxic sludge, still smelling of the swamp's worst perfume, but at least they're back.",
-      "\ud83c\udf3f *{name}* scrubned the swamp sludge off their boots and is ready to ruin another batch of poison resistance mead."
+      "☣️ *{name}* squelches back, still radiating the faint, putrid aroma of toxic green goo.",
+      "🤢 Miraculously, *{name}* has re-materialized from the toxic sludge, still smelling of the swamp's worst perfume, but at least they're back.",
+      "🌿 *{name}* scrubned the swamp sludge off their boots and is ready to ruin another batch of poison resistance mead.",
+      "🧼 *{name}* has been pressure-washed and is ready to smell slightly less like sewage."
     ]
   },
   "RAID_SURVIVOR": {
     "leave": [
-      "\u2694\ufe0f *{name}* holds the shieldwall, a paragon of Viking virtue, daring any foe to even glance their way.",
-      "\u2694\ufe0f *{name}* has left the Valheim world, presumably to polish their shield and regale the gods with tales of their flawless defense.",
-      "\ud83d\udee1\ufe0f *{name}* held the shieldwall so hard against the horde that Odin himself choked on his mead."
+      "⚔️ *{name}* holds the shieldwall, a paragon of Viking virtue, daring any foe to even glance their way.",
+      "⚔️ *{name}* has left the Valheim world, presumably to polish their shield and regale the gods with tales of their flawless defense.",
+      "🛡️ *{name}* held the shieldwall so hard against the horde that Odin himself choked on his mead.",
+      "🛡️ *{name}* held the shieldwall so hard Odin himself poured them a horn of mead."
     ],
     "resume": [
-      "\ud83c\udf7b *{name}* returns, ready for another horn of mead, having effortlessly crushed all who dared challenge them.",
-      "\ud83d\udee1\ufe0f Huzzah, *{name}* returns, fresh from upholding the shieldwall with zero casualties and ready to raise another horn!",
-      "\ud83c\udf7b *{name}* is back with the blood still wet on their axe and a thirst that requires three entire kegs."
+      "🍻 *{name}* returns, ready for another horn of mead, having effortlessly crushed all who dared challenge them.",
+      "🛡️ Huzzah, *{name}* returns, fresh from upholding the shieldwall with zero casualties and ready to raise another horn!",
+      "🍻 *{name}* is back with the blood still wet on their axe and a thirst that requires three entire kegs.",
+      "🍻 *{name}* returns from the feast, still boasting about a fight where they barely scratched their shield."
     ]
   },
   "CORPSE_RUN_FAIL": {
     "leave": [
-      "\ud83c\udfc3 *{name}* has died again, naked and panting, proving that some lessons require multiple, embarrassing attempts.",
-      "\ud83c\udfc3 *{name}* has died a pants-less, panicked death during a corpse run, proving that 25 HP and no trousers is a terrible combination.",
-      "\ud83c\udfc3 *{name}* sprinted pantsless into the dark with 25 HP and died immediately trying to grab a glowing tombstone."
+      "🏃 *{name}* has died again, naked and panting, proving that some lessons require multiple, embarrassing attempts.",
+      "🏃 *{name}* has died a pants-less, panicked death during a corpse run, proving that 25 HP and no trousers is a terrible combination.",
+      "🏃 *{name}* sprinted pantsless into the dark with 25 HP and died immediately trying to grab a glowing tombstone.",
+      "🏃 *{name}* died buck-naked running toward their tombstone with twenty-five health and zero pants."
     ],
     "resume": [
-      "\ud83d\udc56 *{name}* is back, hopefully with clothes this time, after another frantic, pants-optional sprint to their tombstone.",
-      "\ud83d\udc56 *{name}* is back, presumably having finally retrieved their dignity and their trousers after a rather embarrassing afterlife experience.",
-      "\ud83d\udc56 *{name}* has finally accepted that running naked toward enemies is a terrible combat strategy."
+      "👖 *{name}* is back, hopefully with clothes this time, after another frantic, pants-optional sprint to their tombstone.",
+      "👖 *{name}* is back, presumably having finally retrieved their dignity and their trousers after a rather embarrassing afterlife experience.",
+      "👖 *{name}* has finally accepted that running naked toward enemies is a terrible combat strategy.",
+      "👖 *{name}* has finally located their trousers and retrieved the loot of shame."
     ]
   },
   "RAGE_QUIT": {
     "leave": [
-      "\ud83d\udd0c *{name}* has abruptly departed, perhaps their internet cable spontaneously combusted at the moment of death.",
-      "\ud83d\udd0c *{name}* has rage-quit with the fury of a thousand berserkers, proving that some deaths are best avoided by yanking the cord.",
-      "\ud83d\udd0c *{name}* violently yanked the ethernet cable out of the wall like a toddler throwing a juice box."
+      "🔌 *{name}* has abruptly departed, perhaps their internet cable spontaneously combusted at the moment of death.",
+      "🔌 *{name}* has rage-quit with the fury of a thousand berserkers, proving that some deaths are best avoided by yanking the cord.",
+      "🔌 *{name}* violently yanked the ethernet cable out of the wall like a toddler throwing a juice box.",
+      "🔌 *{name}* rage-quit so hard their ethernet cable filed for a restraining order."
     ],
     "resume": [
-      "\ud83d\ude21 *{name}* has returned, no doubt still seething from their 'unjust' demise and sudden router malfunction.",
-      "\ud83d\ude21 Well, look who's back, *{name}*! Did the internet finally forgive you, or did you just run out of things to throw?",
-      "\ud83d\udcbb *{name}* plugged the router back in after screaming into a pillow and calming their fragile little heart."
+      "😡 *{name}* has returned, no doubt still seething from their 'unjust' demise and sudden router malfunction.",
+      "😡 Well, look who's back, *{name}*! Did the internet finally forgive you, or did you just run out of things to throw?",
+      "💻 *{name}* plugged the router back in after screaming into a pillow and calming their fragile little heart.",
+      "🖥️ *{name}* crawled back after punching their monitor and cooling their little gamer forehead."
     ]
   },
   "WILDERNESS_DEATH": {
     "leave": [
-      "\ud83c\udf33 *{name}* has been defeated by a rogue birch tree, proving even the environment conspires against them.",
-      "\ud83d\udc80 *{name}* has been tragically outsmarted by a falling birch tree/gravity/hunger, proving that Valheim's deadliest foes are often invisible.",
-      "\ud83e\udeb5 *{name}* lost a brutal 1v1 grudge match against a rogue falling birch tree and gravity."
+      "🌳 *{name}* has been defeated by a rogue birch tree, proving even the environment conspires against them.",
+      "💀 *{name}* has been tragically outsmarted by a falling birch tree/gravity/hunger, proving that Valheim's deadliest foes are often invisible.",
+      "🪵 *{name}* lost a brutal 1v1 grudge match against a rogue falling birch tree and gravity.",
+      "🌲 *{name}* lost a tragic 1v1 against gravity and a sentient birch tree."
     ],
     "resume": [
-      "\u26f0\ufe0f *{name}* is back, hopefully having learned that gravity and falling timber are not to be trifled with.",
-      "\ud83c\udf32 *{name}* has returned from their environmental timeout, hopefully having learned that trees and cliffs can be surprisingly aggressive.",
-      "\ud83c\udf33 *{name}* returns with a severe concussion and a sworn, undying blood-feud against all lumber."
+      "⛰️ *{name}* is back, hopefully having learned that gravity and falling timber are not to be trifled with.",
+      "🌲 *{name}* has returned from their environmental timeout, hopefully having learned that trees and cliffs can be surprisingly aggressive.",
+      "🌳 *{name}* returns with a severe concussion and a sworn, undying blood-feud against all lumber.",
+      "🪓 *{name}* is back with a personal vendetta against every piece of lumber on the continent."
     ]
   },
   "SEA_VOYAGE": {
     "leave": [
-      "\u26f5 *{name}* is off to paddle against the headwind for an hour, contemplating the futility of nautical ambition.",
-      "\u26f5 *{name}* has departed Valheim, presumably to find land after an hour of paddling against a headwind, probably still paranoid about sea serpents.",
-      "\u26f5 *{name}* has been paddling a leaky walnut shell against a hurricane-force headwind for the past eternity."
+      "⛵ *{name}* is off to paddle against the headwind for an hour, contemplating the futility of nautical ambition.",
+      "⛵ *{name}* has departed Valheim, presumably to find land after an hour of paddling against a headwind, probably still paranoid about sea serpents.",
+      "⛵ *{name}* has been paddling a leaky walnut shell against a hurricane-force headwind for the past eternity.",
+      "⛵ *{name}* sailed directly into a headwind for an hour and went completely insane from wet boots."
     ],
     "resume": [
-      "\ud83c\udf0a *{name}* returns, boots still squelching, having braved the endless ocean and the whispers of sea serpents.",
-      "\ud83c\udf0a Ahoy, *{name}* has returned from their epic paddle, hopefully with dry boots and no lingering fear of the deep.",
-      "\ud83c\udf0a *{name}* has finally dragged their soggy, shivering carcass ashore with permanent sea serpent PTSD."
+      "🌊 *{name}* returns, boots still squelching, having braved the endless ocean and the whispers of sea serpents.",
+      "🌊 Ahoy, *{name}* has returned from their epic paddle, hopefully with dry boots and no lingering fear of the deep.",
+      "🌊 *{name}* has finally dragged their soggy, shivering carcass ashore with permanent sea serpent PTSD.",
+      "🌊 *{name}* has dried out their socks and is ready to crash another longship into a reef."
     ]
   },
   "SEA_CASUALTY": {
     "leave": [
-      "\ud83e\udddc\u200d\u2640\ufe0f *{name}* has embraced the sea, becoming one with the kelp after a tragic encounter with a rogue wave.",
-      "\ud83c\udf0a *{name}* has capsized and become one with the ocean, proving that the deep holds more than just fish and existential dread.",
-      "\ud83e\udd91 *{name}* got completely obliterated by ocean waves and fed their loot directly to the nearest hungry leviathan."
+      "🧜‍♀️ *{name}* has embraced the sea, becoming one with the kelp after a tragic encounter with a rogue wave.",
+      "🌊 *{name}* has capsized and become one with the ocean, proving that the deep holds more than just fish and existential dread.",
+      "🦑 *{name}* got completely obliterated by ocean waves and fed their loot directly to the nearest hungry leviathan.",
+      "🦑 *{name}* fed the sea serpents after capsizing their karve in a puddle of open ocean."
     ],
     "resume": [
-      "\u2693 *{name}* is back, probably still coughing up saltwater and vowing revenge on all aquatic life.",
-      "\ud83d\udca6 *{name}* has washed ashore, miraculously un-drowned, but still smelling faintly of saltwater and poor navigation skills.",
-      "\u2693 *{name}* washed ashore wrapped in seaweed, coughing up saltwater and profound nautical regret."
+      "⚓ *{name}* is back, probably still coughing up saltwater and vowing revenge on all aquatic life.",
+      "💦 *{name}* has washed ashore, miraculously un-drowned, but still smelling faintly of saltwater and poor navigation skills.",
+      "⚓ *{name}* washed ashore wrapped in seaweed, coughing up saltwater and profound nautical regret.",
+      "⚓ *{name}* washed ashore like a bloated pufferfish and demands a new boat immediately."
     ]
   },
   "MARATHON_GRIND": {
     "leave": [
-      "\ud83d\udd28 *{name}* has vanished into the dark, probably lost in a trance of perfectly aligned roof tiles or a copper vein.",
-      "\ud83d\udd28 *{name}* has left the server after {duration_mins} of obsessive building/mining, probably mumbling about roof snaps and copper veins.",
-      "\u26cf\ufe0f *{name}* locked themselves in the dark for two hours straight, obsessively snapping roof tiles while eating raw mushrooms."
+      "🔨 *{name}* has vanished into the dark, probably lost in a trance of perfectly aligned roof tiles or a copper vein.",
+      "🔨 *{name}* has left the server after {duration_mins} of obsessive building/mining, probably mumbling about roof snaps and copper veins.",
+      "⛏️ *{name}* locked themselves in the dark for two hours straight, obsessively snapping roof tiles while eating raw mushrooms.",
+      "🔨 *{name}* locked themselves in a dark cave for two hours to align floor tiles like a madman."
     ],
     "resume": [
-      "\u26cf\ufe0f *{name}* re-emerges, blinking in the daylight, eyes glazed over from {duration_mins} minutes of obsessive crafting.",
-      "\u26cf\ufe0f *{name}* has re-emerged from their OCD-fueled grind, blinking in the daylight and smelling faintly of stone dust and single-minded dedication.",
-      "\ud83d\udc41\ufe0f *{name}* emerged from the copper mine with hollow eyes, carpal tunnel, and a deeply unhealthy obsession with stone pillars."
+      "⛏️ *{name}* re-emerges, blinking in the daylight, eyes glazed over from {duration_mins} minutes of obsessive crafting.",
+      "⛏️ *{name}* has re-emerged from their OCD-fueled grind, blinking in the daylight and smelling faintly of stone dust and single-minded dedication.",
+      "👁️ *{name}* emerged from the copper mine with hollow eyes, carpal tunnel, and a deeply unhealthy obsession with stone pillars.",
+      "⛏️ *{name}* emerges from the mines blind, muttering about copper nodes in the pitch-black rain."
     ]
   },
   "QUICK_DIP": {
     "leave": [
-      "\ud83d\udca8 *{name}* peeked, saw a cloud, and instantly decided their desktop was a far safer, dryer biome.",
-      "\ud83d\udeaa *{name}* took a quick dip into Valheim for less than {duration_mins} and promptly noped out, proving they prefer their desktops to dark forests.",
-      "\ud83d\udca8 *{name}* peeked outside into the rain, got terrified, and instantly rage-quit back to the desktop."
+      "💨 *{name}* peeked, saw a cloud, and instantly decided their desktop was a far safer, dryer biome.",
+      "🚪 *{name}* took a quick dip into Valheim for less than {duration_mins} and promptly noped out, proving they prefer their desktops to dark forests.",
+      "💨 *{name}* peeked outside into the rain, got terrified, and instantly rage-quit back to the desktop.",
+      "🚪 *{name}* peeked outside, saw rain and dark trees, and noped straight back to desktop like a frightened toddler."
     ],
     "resume": [
-      "\ud83d\udecb\ufe0f *{name}* is back, having successfully retreated from the 'harsh' weather conditions of Valheim's loading screen.",
-      "\ud83d\udecb\ufe0f Well, *{name}* is back, having bravely returned from their desktop to face the horrors of slightly damp pixels.",
-      "\ud83d\udeaa *{name}* has bravely decided to face the pixels again after changing their damp Viking diapers."
+      "🛋️ *{name}* is back, having successfully retreated from the 'harsh' weather conditions of Valheim's loading screen.",
+      "🛋️ Well, *{name}* is back, having bravely returned from their desktop to face the horrors of slightly damp pixels.",
+      "🚪 *{name}* has bravely decided to face the pixels again after changing their damp Viking diapers.",
+      "🌤️ *{name}* has bravely decided the weather outside is acceptable for peasant work."
     ]
   },
-  "_last_refreshed_at": "2026-10-05 08:27:40 IST"
+  "_last_refreshed_at": "2026-10-11 21:30:10 IST"
 }

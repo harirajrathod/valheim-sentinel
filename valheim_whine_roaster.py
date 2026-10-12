@@ -15,6 +15,9 @@ import random
 import time
 import urllib.request
 
+sys.path.insert(0, "/root")
+from valheim_utils import safe_urlopen
+
 # Curated, Lore-Accurate Viking Roasts — EVERY SINGLE ONE IS AROUND 25 WORDS (SMART & WITTY)
 CURATED_25_WORD_ROASTS = {
     "tree": [
@@ -157,7 +160,7 @@ def generate_ai_roast(complaint_text, sender_name="Viking"):
             headers={"Content-Type": "application/json"}
         )
         try:
-            with urllib.request.urlopen(req, timeout=6) as response:
+            with safe_urlopen(req, timeout=6) as response:
                 res_body = response.read().decode("utf-8")
                 res_json = json.loads(res_body)
                 text = res_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
@@ -232,7 +235,8 @@ def format_whatsapp_roast(roast_text, sender_name=""):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Valheim Whine & Complaint Roaster (~25 words)")
-    parser.add_argument("--roast", nargs="*", help="Complaint text to roast")
+    parser.add_argument("complaint", nargs="*", help="Complaint text to roast (positional)")
+    parser.add_argument("--roast", nargs="*", help="Complaint text to roast (flag)")
     parser.add_argument("--sender", default="Viking", help="Name of the complaining warrior")
     parser.add_argument("--detect", nargs="*", help="Check if text is a game complaint")
     args = parser.parse_args()
@@ -241,7 +245,7 @@ if __name__ == "__main__":
         det_text = " ".join(args.detect)
         print("COMPLAINT" if is_game_complaint(det_text) else "NOT_COMPLAINT")
     else:
-        text = " ".join(args.roast) if args.roast else ""
+        text = " ".join(args.complaint) if args.complaint else (" ".join(args.roast) if args.roast else "")
         resolved_name = clean_sender_name(args.sender) or "Viking"
         roast = get_roast(text, resolved_name)
         print(format_whatsapp_roast(roast, args.sender))

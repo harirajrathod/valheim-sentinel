@@ -3,10 +3,12 @@
 /root/valheim_farm.py - Valheim Homestead Farming, Seed Cycle Tracker & Apiary Engine
 
 Features:
-- Scans active world chunks for planted crops, seed plants, and beehives
-- Tracks seed cycles (growing -> ripe) and detects cycle completion
-- Emits celebratory, friendly WhatsApp announcements when crops are ready for harvest
-- Integrates with valheim_info.py for !farm, !farming, !harvest commands
+- Scans active world chunks for cultivated crops, seed plants, and apiaries
+- Filters out wild wilderness flora so only actual homestead/settlement farming is tracked
+- Tracks full seed cycle life-stage (planted -> growing -> mature) with robust state machine
+- Emits celebratory, friendly WhatsApp announcements when a growing cycle completes
+- Prevents spamming: announces exactly once per cycle and stays silent until new crops are planted
+- Integrates with valheim_info.py for !farm, !farming, !harvest, !crops commands
 - Atomic persistence with /root/valheim_farm_state.json and cooldown guards
 """
 
@@ -15,8 +17,8 @@ import sys
 import time
 import glob
 import re
+import math
 import struct
-import ctypes
 import argparse
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Tuple, List, Optional
@@ -36,6 +38,7 @@ from valheim_utils import (
 STATE_FILE = "/root/valheim_farm_state.json"
 ANNOUNCEMENT_COOLDOWN_SEC = 2700  # 45-minute cooldown between automated announcements
 MIN_HARVEST_THRESHOLD = 15       # Minimum ready crops to warrant a cycle announcement
+MAIN_BASE_COORDS = (12.8, -360.1)
 
 # Supported Crops & Agricultural Prefabs across all game biomes
 FARM_PREFABS = {
@@ -54,61 +57,93 @@ FARM_PREFABS = {
     'Pickable_JotunPuffs': ('ready_puffs',   'Jötun Puffs',  'crop', 1, '🪨'),
 
     # Currently Growing Plants (Cultivated and maturing)
-    'Carrot':              ('growing_carrots', 'Carrot Plants',   'growing', 0, '🌱'),
-    'Turnip':              ('growing_turnips', 'Turnip Plants',   'growing', 0, '🌱'),
-    'Onion':               ('growing_onions',  'Onion Plants',    'growing', 0, '🌱'),
-    'Barley':              ('growing_barley',  'Barley Plants',   'growing', 0, '🌱'),
-    'Flax':                ('growing_flax',    'Flax Plants',     'growing', 0, '🌱'),
-    'Magecap':             ('growing_magecap', 'Magecap Plants',  'growing', 0, '🌱'),
-    'JotunPuffs':          ('growing_puffs',   'Jötun Puff Plants','growing', 0, '🌱'),
+    'piece_sapling_carrot':      ('growing_carrots', 'Carrot Plants', 'growing', 0, '🌱'),
+    'piece_sapling_turnip':      ('growing_turnips', 'Turnip Plants', 'growing', 0, '🌱'),
+    'piece_sapling_onion':       ('growing_onions',  'Onion Plants',  'growing', 0, '🌱'),
+    'piece_sapling_barley':      ('growing_barley',  'Barley Plants', 'growing', 0, '🌱'),
+    'piece_sapling_flax':        ('growing_flax',    'Flax Plants',   'growing', 0, '🌱'),
+    'piece_sapling_magecap':     ('growing_magecap', 'Magecap Plants','growing', 0, '🌱'),
+    'piece_sapling_jotunpuffs':  ('growing_puffs',   'Jötun Puff Plants','growing', 0, '🌱'),
+    'piece_sapling_seedcarrot':  ('growing_seed_carrots', 'Seed Carrot Plants', 'growing_seed', 0, '🌱'),
+    'piece_sapling_seedturnip':  ('growing_seed_turnips', 'Seed Turnip Plants', 'growing_seed', 0, '🌱'),
+    'piece_sapling_seedonion':   ('growing_seed_onions',  'Seed Onion Plants',  'growing_seed', 0, '🌱'),
 
     # Apiary
     'piece_beehive':       ('beehives',        'Beehives',        'hive',    0, '🐝'),
 }
 
 HASH_TO_PREFAB = {struct.pack('<i', get_stable_hash(k)): k for k in FARM_PREFABS}
-
-def get_active_chunk_files() -> List[str]:
-    """Returns list of active, deduplicated world chunk files."""
-    raw_chunks = glob.glob('/root/.config/unity3d/IronGate/Valheim/worlds_local/Valheim10/*.chunk')
-    chunks_by_prefix = {}
-    for c in raw_chunks:
-        m = re.match(r'^(.*__\d+)_(\d+)\.chunk$', c)
-        if m:
-            prefix, ver = m.group(1), int(m.group(2))
-            if prefix not in chunks_by_prefix or ver > chunks_by_prefix[prefix][0]:
-                chunks_by_prefix[prefix] = (ver, c)
-        else:
-            chunks_by_prefix[c] = (0, c)
-    return [c for _, c in chunks_by_prefix.values()]
+PORTAL_HASHES = {struct.pack('<i', get_stable_hash(k)) for k in ['portal_wood', 'portal_stone']}
 
 def scan_farm_world() -> Dict[str, Any]:
     """
-    Scans active world chunks for all placed agricultural entities.
+    Scans active world chunks for all cultivated agricultural entities.
+    Filters out wild wilderness flowers by verifying base proximity, portal proximity,
+    or cultivated cluster density.
     Returns categorized counts of ready crops, seed plants, growing plants, and beehives.
     """
     chunks = get_active_chunk_files()
-    raw_counts = {k: 0 for k in FARM_PREFABS}
-    
+    portals = []
+    raw_farm_items = []
+
     for c in chunks:
         try:
             with open(c, 'rb') as f:
                 data = f.read()
-            for p_bytes, prefab_name in HASH_TO_PREFAB.items():
-                idx = 0
-                while True:
-                    idx = data.find(p_bytes, idx)
-                    if idx == -1:
-                        break
-                    if idx >= 12:
-                        x, y, z = struct.unpack('<fff', data[idx-12:idx])
-                        # Filter valid placed coordinates within world boundaries (excluding origin 0,0,0)
-                        if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
-                            and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
-                            raw_counts[prefab_name] += 1
-                    idx += 4
         except Exception:
-            pass
+            continue
+
+        # Extract registered portals to identify remote farming outposts
+        for ph in PORTAL_HASHES:
+            idx = 0
+            while True:
+                idx = data.find(ph, idx)
+                if idx == -1:
+                    break
+                if idx >= 12:
+                    x, y, z = struct.unpack('<fff', data[idx-12:idx])
+                    if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
+                        and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
+                        portals.append((x, z))
+                idx += 4
+
+        # Extract potential agricultural prefabs
+        for p_bytes, prefab_name in HASH_TO_PREFAB.items():
+            idx = 0
+            while True:
+                idx = data.find(p_bytes, idx)
+                if idx == -1:
+                    break
+                if idx >= 12:
+                    x, y, z = struct.unpack('<fff', data[idx-12:idx])
+                    if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
+                        and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
+                        raw_farm_items.append((x, y, z, prefab_name))
+                idx += 4
+
+    raw_counts = {k: 0 for k in FARM_PREFABS}
+
+    # Filter out wild wilderness flowers
+    for x, y, z, prefab_name in raw_farm_items:
+        if prefab_name in ('Pickable_SeedCarrot', 'Pickable_SeedTurnip'):
+            # 1. Proximity to Clan Homestead / Main Base
+            if math.hypot(x - MAIN_BASE_COORDS[0], z - MAIN_BASE_COORDS[1]) <= 150:
+                raw_counts[prefab_name] += 1
+                continue
+            # 2. Proximity to any clan portal outpost with at least 1 other companion crop
+            if any(math.hypot(x - px, z - pz) <= 60 for px, pz in portals):
+                if sum(1 for ox, oy, oz, op in raw_farm_items if math.hypot(x - ox, z - oz) <= 30) >= 2:
+                    raw_counts[prefab_name] += 1
+                    continue
+            # 3. Cultivated crop cluster (at least 5 crops planted within 25m)
+            nearby_crops = sum(1 for ox, oy, oz, op in raw_farm_items if math.hypot(x - ox, z - oz) <= 25)
+            if nearby_crops >= 5:
+                raw_counts[prefab_name] += 1
+                continue
+        else:
+            # All other prefabs (piece_sapling_*, Pickable_Carrot, piece_beehive, etc.)
+            # are inherently player-cultivated or constructed
+            raw_counts[prefab_name] += 1
 
     # Aggregate into high-level categories
     ready_seeds = {
@@ -126,13 +161,16 @@ def scan_farm_world() -> Dict[str, Any]:
         'jotun_puffs': raw_counts.get('Pickable_JotunPuffs', 0),
     }
     growing = {
-        'carrots':     raw_counts.get('Carrot', 0),
-        'turnips':     raw_counts.get('Turnip', 0),
-        'onions':      raw_counts.get('Onion', 0),
-        'barley':      raw_counts.get('Barley', 0),
-        'flax':        raw_counts.get('Flax', 0),
-        'magecap':     raw_counts.get('Magecap', 0),
-        'jotun_puffs': raw_counts.get('JotunPuffs', 0),
+        'carrots':       raw_counts.get('piece_sapling_carrot', 0),
+        'turnips':       raw_counts.get('piece_sapling_turnip', 0),
+        'onions':        raw_counts.get('piece_sapling_onion', 0),
+        'barley':        raw_counts.get('piece_sapling_barley', 0),
+        'flax':          raw_counts.get('piece_sapling_flax', 0),
+        'magecap':       raw_counts.get('piece_sapling_magecap', 0),
+        'jotun_puffs':   raw_counts.get('piece_sapling_jotunpuffs', 0),
+        'seed_carrots':  raw_counts.get('piece_sapling_seedcarrot', 0),
+        'seed_turnips':  raw_counts.get('piece_sapling_seedturnip', 0),
+        'seed_onions':   raw_counts.get('piece_sapling_seedonion', 0),
     }
     beehives = raw_counts.get('piece_beehive', 0)
 
@@ -199,6 +237,10 @@ def format_farm_report() -> str:
             lines.append(f"• 🌾 *Barley:* {rc['barley']:,} ripe")
         if rc['flax'] > 0:
             lines.append(f"• 🧵 *Flax:* {rc['flax']:,} ripe")
+        if rc['magecap'] > 0:
+            lines.append(f"• 🍄 *Magecaps:* {rc['magecap']:,} ripe")
+        if rc['jotun_puffs'] > 0:
+            lines.append(f"• 🪨 *Jötun Puffs:* {rc['jotun_puffs']:,} ripe")
         lines.append("")
 
     # 3. Growing Crops (if any)
@@ -207,7 +249,8 @@ def format_farm_report() -> str:
         gw = farm['growing']
         for k, v in gw.items():
             if v > 0:
-                lines.append(f"• 🌱 *{k.title()}:* {v:,} planted (maturing...)")
+                name_clean = k.replace('_', ' ').title()
+                lines.append(f"• 🌱 *{name_clean}:* {v:,} planted (maturing...)")
         lines.append("")
 
     if farm['total_ready'] == 0 and farm['total_growing'] == 0:
@@ -273,9 +316,16 @@ def format_cycle_complete_announcement(farm: Dict[str, Any]) -> str:
         lines.append(f"• 🌿 *Turnips:* {rc['turnips']:,} vegetables")
     if rc['barley'] > 0:
         lines.append(f"• 🌾 *Barley:* {rc['barley']:,} bundles")
+    if rc['flax'] > 0:
+        lines.append(f"• 🧵 *Flax:* {rc['flax']:,} stalks")
+    if rc['magecap'] > 0:
+        lines.append(f"• 🍄 *Magecaps:* {rc['magecap']:,} mushrooms")
+    if rc['jotun_puffs'] > 0:
+        lines.append(f"• 🪨 *Jötun Puffs:* {rc['jotun_puffs']:,} caps")
 
     lines.append(f"• 🌾 *Total Ready:* {farm['total_ready']:,} crops")
-    lines.append(f"• 🐝 *Apiary:* {farm['beehives']} active beehives producing sweet honey")
+    if farm.get('beehives', 0) > 0:
+        lines.append(f"• 🐝 *Apiary:* {farm['beehives']} active beehives producing sweet honey")
     lines.append("")
     lines.append("Grab your Cultivator, bring in the golden harvest, and re-sow the fields! 🧺🥕🧅 Skål! 🍻")
 
@@ -284,6 +334,7 @@ def format_cycle_complete_announcement(farm: Dict[str, Any]) -> str:
 def check_and_announce_seed_cycle(force: bool = False, dry_run: bool = False) -> bool:
     """
     Checks if a seed cycle has completed and sends the WhatsApp announcement if appropriate.
+    Guarantees no repetitive spamming: only announces once when an active growing cycle matures.
     Returns True if an announcement was sent.
     """
     farm = scan_farm_world()
@@ -296,7 +347,8 @@ def check_and_announce_seed_cycle(force: bool = False, dry_run: bool = False) ->
             'last_total_ready': farm['total_ready'],
             'last_total_growing': farm['total_growing'],
             'last_announced_ready': farm['total_ready'],
-            'last_announcement_time': 0,
+            'last_announcement_time': now_t,
+            'cycle_in_progress': (farm['total_growing'] > 0),
             'last_updated': now_t
         }
         if not dry_run:
@@ -308,17 +360,41 @@ def check_and_announce_seed_cycle(force: bool = False, dry_run: bool = False) ->
     last_announced_time = state.get('last_announcement_time', 0) if state else 0
     last_announced_ready = state.get('last_announced_ready', 0) if state else 0
     last_growing = state.get('last_total_growing', 0) if state else 0
+    cycle_in_progress = state.get('cycle_in_progress', False) if state else False
     time_since_announcement = now_t - last_announced_time
 
-    # Trigger conditions:
-    # 1. Force flag passed
-    # 2. Previous batch was growing and now matured to ready
-    # 3. Ready count jumped by >= 20 crops and cooldown expired
-    matured_transition = (last_growing > 0 and farm['total_growing'] == 0 and farm['total_ready'] >= MIN_HARVEST_THRESHOLD)
-    count_jump = (farm['total_ready'] - last_announced_ready >= 20)
+    # Life-cycle state management:
+    # 1. New plantings detected: mark cycle in progress
+    if farm['total_growing'] > 0:
+        cycle_in_progress = True
+
+    # 2. Crops harvested: update last_announced_ready downwards
+    if farm['total_ready'] < last_announced_ready:
+        last_announced_ready = farm['total_ready']
+
+    # 3. Determine if a seed cycle just finished maturing
+    # A cycle completed if:
+    # - A cycle was in progress (crops were actively planted/growing)
+    # - Crops transitioned from growing to mature (growing dropped to <= 2)
+    # - Ready crop count meets threshold (>= 15)
+    # - Cooldown period has elapsed (>= 45m)
+    matured_transition = (
+        cycle_in_progress and
+        last_growing > 0 and
+        farm['total_growing'] <= 2 and
+        farm['total_ready'] >= MIN_HARVEST_THRESHOLD
+    )
+
+    # Secondary check: significant jump in ready crops while a cycle was active
+    fresh_batch_ready = (
+        cycle_in_progress and
+        (farm['total_ready'] - last_announced_ready >= 20) and
+        farm['total_ready'] >= MIN_HARVEST_THRESHOLD
+    )
+
     cooldown_ok = (time_since_announcement >= ANNOUNCEMENT_COOLDOWN_SEC)
 
-    should_announce = force or (matured_transition and cooldown_ok) or (count_jump and cooldown_ok)
+    should_announce = force or ((matured_transition or fresh_batch_ready) and cooldown_ok)
 
     # Save updated monitoring state
     new_state = {
@@ -326,10 +402,11 @@ def check_and_announce_seed_cycle(force: bool = False, dry_run: bool = False) ->
         'last_total_growing': farm['total_growing'],
         'last_announced_ready': farm['total_ready'] if should_announce else last_announced_ready,
         'last_announcement_time': now_t if should_announce else last_announced_time,
+        'cycle_in_progress': False if should_announce else cycle_in_progress,
         'last_updated': now_t
     }
 
-    if should_announce and farm['total_ready'] >= MIN_HARVEST_THRESHOLD:
+    if force or (should_announce and farm['total_ready'] >= MIN_HARVEST_THRESHOLD):
         msg = format_cycle_complete_announcement(farm)
         print(f"[valheim_farm] Seed cycle complete detected ({farm['total_ready']} ready)! Sending announcement...")
         if not dry_run:

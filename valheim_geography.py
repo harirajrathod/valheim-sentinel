@@ -172,6 +172,9 @@ def get_portal_location_desc(x, y, z):
 
     LANDMARKS = [
         ("The Elder Altar", "🌲", -1660.0, 1414.0, 180),
+        ("Bonemass Altar", "☣️", 462.3, -2547.0, 180),
+        ("Moder Altar", "❄️", 2247.1, 1918.2, 180),
+        ("Eikthyr Altar", "⚡", -764.0, -73.5, 180),
         ("Haldor the Merchant", "🪙", -1669.2, 262.1, 180),
         ("Hildir the Trader", "👗", -3832.1, -251.8, 180),
         ("The Bog Witch", "🧙‍♀️", 443.8, -3196.1, 300),
@@ -506,6 +509,7 @@ def get_world_signs():
                     shift += 7
                 raw_text = zdo_window[p:p+tag_len].decode('utf-8', errors='replace')
                 clean_text = re.sub(r'</?[a-zA-Z][^>]*>', '', raw_text)
+                clean_text = clean_text.replace('*', '')
                 clean_text = ' '.join(clean_text.split())
 
                 creator = "Homestead"
@@ -537,7 +541,9 @@ def get_signs_report():
     LANDMARK_KEYWORDS = [
         'hall of heroes', 'the bacon factory', 'spawn base', 'sacrificial stones',
         'portal hub', 'witch stairs', 'walking deck', 'kitchen', 'brewery',
-        'fallen & farms', 'fob', 'base / coal', 'bases', 'merchants', 'farm'
+        'fallen & farms', 'fob', 'base / coal', 'bases', 'merchants', 'farm',
+        'haven', 'vault', 'shrine', 'temple', 'tower', 'outpost', 'fort',
+        'danger', 'zone'
     ]
 
     landmarks = []

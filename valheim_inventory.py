@@ -10,6 +10,7 @@ import struct
 import ctypes
 import argparse
 import subprocess
+import difflib
 from datetime import datetime, timedelta, timezone
 from itertools import combinations
 
@@ -29,23 +30,22 @@ from valheim_geography import get_traders_status
 from valheim_progression import get_progression_state
 
 
-_INVENTORY_CACHE_FILE = '/tmp/valheim_inventory_cache.json'
+_INVENTORY_CACHE_FILE = '/root/.cache/valheim_inventory_cache.json'
 _INVENTORY_CACHE_TTL = 15
 
-def scan_world_inventory():
-    if os.path.exists(_INVENTORY_CACHE_FILE):
+def scan_world_inventory(force_refresh: bool = False):
+    if not force_refresh and os.path.exists(_INVENTORY_CACHE_FILE):
         if time.time() - os.path.getmtime(_INVENTORY_CACHE_FILE) < _INVENTORY_CACHE_TTL:
             try:
-                with open(_INVENTORY_CACHE_FILE, 'r') as f:
-                    data = json.load(f)
-                return data['totals'], data['container_count']
+                data = safe_load_json(_INVENTORY_CACHE_FILE, default=None)
+                if data and 'totals' in data and 'container_count' in data:
+                    return data['totals'], data['container_count']
             except Exception:
                 pass
                 
     totals, container_count = _scan_world_inventory_uncached()
     try:
-        with open(_INVENTORY_CACHE_FILE, 'w') as f:
-            json.dump({'totals': totals, 'container_count': container_count}, f)
+        atomic_save_json(_INVENTORY_CACHE_FILE, {'totals': totals, 'container_count': container_count})
     except Exception:
         pass
     return totals, container_count
@@ -234,11 +234,11 @@ def get_metal_report():
     lines.append("")
     lines.append("🔨 *Forge & Equipment Readiness:*")
     if current_tier <= 4:
-        wolf_sets = min(silver_bars // 14, iron_bars // 40) if iron_bars >= 40 else 0
+        wolf_sets = silver_bars // 40
         if wolf_sets > 0:
-            lines.append(f"• ❄️ *Wolf Armor:* ✅ {wolf_sets} full set(s) craftable now from {silver_bars} Silver & {iron_bars} Iron bars!")
+            lines.append(f"• ❄️ *Wolf Armor:* ✅ {wolf_sets} set(s) craftable now from {silver_bars} Silver bars (40 Silver/set)!")
         else:
-            lines.append(f"• ❄️ *Wolf Armor:* {silver_bars}/14 Silver bars, {iron_bars}/40 Iron bars")
+            lines.append(f"• ❄️ *Wolf Armor:* {silver_bars}/40 Silver bars")
         lines.append(f"• ⚔️ *Silver Weapons:* {silver_bars} Silver bars ready for Silver Sword / Frostner")
         lines.append(f"• ⛵ *Iron Infrastructure:* {iron_bars} Iron bars ready for nails & tools")
         if black_total > 0:
@@ -405,22 +405,28 @@ def get_food_report():
     # 1. Tank
     health_sorted = sorted(available_foods.values(), key=lambda x: (x['hp'], x['stam']), reverse=True)
     tank_combo = health_sorted[:3]
-    tank_hp = 25 + sum(x['hp'] for x in tank_combo)
-    tank_stam = 50 + sum(x['stam'] for x in tank_combo)
-    tank_rations = min(x['total'] for x in tank_combo)
-    tank_names = " + ".join(f"{x['name']} ({x['hp']} HP)" for x in tank_combo)
-    lines.append(f"⚔️ *Tank:* {tank_names}")
-    lines.append(f"   ↳ 🔥 *{tank_hp} HP | {tank_stam} Stam* ({tank_rations} rations ready)")
+    if tank_combo:
+        tank_hp = 25 + sum(x['hp'] for x in tank_combo)
+        tank_stam = 50 + sum(x['stam'] for x in tank_combo)
+        tank_rations = min((x['total'] for x in tank_combo), default=0)
+        tank_names = " + ".join(f"{x['name']} ({x['hp']} HP)" for x in tank_combo)
+        lines.append(f"⚔️ *Tank:* {tank_names}")
+        lines.append(f"   ↳ 🔥 *{tank_hp} HP | {tank_stam} Stam* ({tank_rations} rations ready)")
+    else:
+        lines.append("⚔️ *Tank:* _No food in stock — forage meat & veggies!_")
 
     # 2. Stamina
     stam_sorted = sorted(available_foods.values(), key=lambda x: (x['stam'], x['hp']), reverse=True)
     stam_combo = stam_sorted[:3]
-    stam_st = 50 + sum(x['stam'] for x in stam_combo)
-    stam_hp = 25 + sum(x['hp'] for x in stam_combo)
-    stam_rations = min(x['total'] for x in stam_combo)
-    stam_names = " + ".join(f"{x['name']} ({x['stam']} Stam)" for x in stam_combo)
-    lines.append(f"⚡ *Stamina:* {stam_names}")
-    lines.append(f"   ↳ ⚡ *{stam_st} Stam | {stam_hp} HP* ({stam_rations} rations ready)")
+    if stam_combo:
+        stam_st = 50 + sum(x['stam'] for x in stam_combo)
+        stam_hp = 25 + sum(x['hp'] for x in stam_combo)
+        stam_rations = min((x['total'] for x in stam_combo), default=0)
+        stam_names = " + ".join(f"{x['name']} ({x['stam']} Stam)" for x in stam_combo)
+        lines.append(f"⚡ *Stamina:* {stam_names}")
+        lines.append(f"   ↳ ⚡ *{stam_st} Stam | {stam_hp} HP* ({stam_rations} rations ready)")
+    else:
+        lines.append("⚡ *Stamina:* _No stamina food in stock — forage berries & honey!_")
 
     # 3. Balanced
     best_bal = None
@@ -478,6 +484,8 @@ def get_armour_report():
     silver_total = silver_bars + silver_ore
     wolf_pelt    = totals.get('WolfPelt', 0)
     wolf_fang    = totals.get('WolfFang', 0)
+    fine_wood    = totals.get('FineWood', 0)
+    drake_trophy = totals.get('TrophyHatchling', 0)
 
     black_bars   = totals.get('BlackMetal', 0)
     black_scrap  = totals.get('BlackMetalScrap', 0)
@@ -516,18 +524,21 @@ def get_armour_report():
     lines.append("⚔️ *Current Tier Equipment:*")
 
     if current_tier == 4:
-        lines.append("• ❄️ *Wolf Armor Set* (78 armor, Frost Resist)")
-        lines.append("  _Cost:_ ~40 Iron + 14 Silver + 10 Wolf Pelt + 2 Wolf Fang")
-        if silver_bars >= 14 and wolf_pelt >= 10 and iron_bars >= 40:
-            lines.append("  ✅ *Full Wolf Armor craftable now!*")
+        lines.append("• ❄️ *Wolf Armor Set* (Chest & Legs: 40 Silver + 10 Wolf Pelt + 4 Wolf Fang + 1 Chain)")
+        if silver_bars >= 40 and wolf_pelt >= 10 and wolf_fang >= 4 and chain >= 1:
+            craftable_sets = min(silver_bars // 40, wolf_pelt // 10, wolf_fang // 4, chain)
+            lines.append(f"  ✅ *Wolf Armor Chest & Legs craftable now!* ({craftable_sets} set(s) ready)")
         else:
             missing = []
-            if silver_bars < 14: missing.append(f"{14-silver_bars} Silver")
+            if silver_bars < 40: missing.append(f"{40-silver_bars} Silver")
             if wolf_pelt < 10: missing.append(f"{10-wolf_pelt} Wolf Pelt")
-            if iron_bars < 40: missing.append(f"{40-iron_bars} Iron")
+            if wolf_fang < 4: missing.append(f"{4-wolf_fang} Wolf Fang")
+            if chain < 1: missing.append(f"{1-chain} Chain")
             lines.append(f"  ⏳ _Missing:_ {', '.join(missing)}")
-        lines.append("• 🔱 *Drake Helmet* (20 armor) — 20 Silver + 2 Drake Trophies")
-        lines.append("• 🛡️ *Silver Shield* (75 block) — 10 Iron + 8 Silver + 10 Fine Wood ✅")
+        helm_status = "✅ Craftable!" if silver_bars >= 20 and drake_trophy >= 2 and wolf_pelt >= 2 else f"⏳ Stock: {silver_bars}/20 Silver, {drake_trophy}/2 Drake Trophies"
+        lines.append(f"• 🔱 *Drake Helmet* (20 armor) — 20 Silver + 2 Wolf Pelt + 2 Drake Trophies ({helm_status})")
+        shield_status = "✅ Craftable!" if silver_bars >= 8 and fine_wood >= 10 else f"⏳ Stock: {silver_bars}/8 Silver, {fine_wood}/10 Fine Wood"
+        lines.append(f"• 🛡️ *Silver Shield* (75 block) — 8 Silver + 10 Fine Wood ({shield_status})")
     elif current_tier == 5:
         lines.append("• 🌾 *Padded Armor Set* (100 armor)")
         lines.append("  _Cost:_ ~30 Iron + 60 Linen Thread (Spinning Wheel + Flax)")
@@ -565,22 +576,251 @@ def get_armour_report():
 
     return "\n".join(lines)
 
-def get_find_report(search_term):
-    totals, container_count = scan_world_inventory()
-    search_lower = search_term.lower()
+# Canonical category item groups for broad & fallback search
+CATEGORY_MAP = {
+    'arrow': [
+        'ArrowWood', 'ArrowFlint', 'ArrowFire', 'ArrowBronze', 'ArrowIron',
+        'ArrowSilver', 'ArrowObsidian', 'ArrowPoison', 'ArrowFrost', 'ArrowNeedle',
+        'ArrowCarapace', 'ArrowBone', 'ArrowCharred'
+    ],
+    'arrows': [
+        'ArrowWood', 'ArrowFlint', 'ArrowFire', 'ArrowBronze', 'ArrowIron',
+        'ArrowSilver', 'ArrowObsidian', 'ArrowPoison', 'ArrowFrost', 'ArrowNeedle',
+        'ArrowCarapace', 'ArrowBone', 'ArrowCharred'
+    ],
+    'ammo': [
+        'ArrowWood', 'ArrowFlint', 'ArrowFire', 'ArrowBronze', 'ArrowIron',
+        'ArrowSilver', 'ArrowObsidian', 'ArrowPoison', 'ArrowFrost', 'ArrowNeedle',
+        'ArrowCarapace', 'ArrowBone', 'ArrowCharred'
+    ],
+    'ammunition': [
+        'ArrowWood', 'ArrowFlint', 'ArrowFire', 'ArrowBronze', 'ArrowIron',
+        'ArrowSilver', 'ArrowObsidian', 'ArrowPoison', 'ArrowFrost', 'ArrowNeedle',
+        'ArrowCarapace', 'ArrowBone', 'ArrowCharred'
+    ],
+    'mead': [
+        'MeadHealthMinor', 'MeadHealthMedium', 'MeadStaminaMinor', 'MeadStaminaMedium',
+        'MeadPoisonResist', 'MeadFrostResist', 'MeadTasty', 'BarleyWine'
+    ],
+    'meads': [
+        'MeadHealthMinor', 'MeadHealthMedium', 'MeadStaminaMinor', 'MeadStaminaMedium',
+        'MeadPoisonResist', 'MeadFrostResist', 'MeadTasty', 'BarleyWine'
+    ],
+    'potion': [
+        'MeadHealthMinor', 'MeadHealthMedium', 'MeadStaminaMinor', 'MeadStaminaMedium',
+        'MeadPoisonResist', 'MeadFrostResist', 'MeadTasty', 'BarleyWine'
+    ],
+    'potions': [
+        'MeadHealthMinor', 'MeadHealthMedium', 'MeadStaminaMinor', 'MeadStaminaMedium',
+        'MeadPoisonResist', 'MeadFrostResist', 'MeadTasty', 'BarleyWine'
+    ],
+    'metal': [
+        'Copper', 'CopperOre', 'Tin', 'TinOre', 'Bronze', 'Iron', 'IronScrap',
+        'Silver', 'SilverOre', 'BlackMetal', 'BlackMetalScrap', 'Flametal', 'FlametalOre'
+    ],
+    'metals': [
+        'Copper', 'CopperOre', 'Tin', 'TinOre', 'Bronze', 'Iron', 'IronScrap',
+        'Silver', 'SilverOre', 'BlackMetal', 'BlackMetalScrap', 'Flametal', 'FlametalOre'
+    ],
+    'ore': ['CopperOre', 'TinOre', 'SilverOre', 'BlackMetalScrap', 'FlametalOre'],
+    'ores': ['CopperOre', 'TinOre', 'SilverOre', 'BlackMetalScrap', 'FlametalOre'],
+    'bars': ['Copper', 'Tin', 'Bronze', 'Iron', 'Silver', 'BlackMetal', 'Flametal'],
+    'bar': ['Copper', 'Tin', 'Bronze', 'Iron', 'Silver', 'BlackMetal', 'Flametal'],
+    'wood': ['Wood', 'FineWood', 'RoundLog', 'YggdrasilWood'],
+    'seed': ['CarrotSeeds', 'TurnipSeeds', 'OnionSeeds', 'AncientSeed'],
+    'seeds': ['CarrotSeeds', 'TurnipSeeds', 'OnionSeeds', 'AncientSeed'],
+    'mushroom': ['Mushroom', 'MushroomYellow', 'MushroomBlue', 'Magecap', 'StuffedMushroom'],
+    'mushrooms': ['Mushroom', 'MushroomYellow', 'MushroomBlue', 'Magecap', 'StuffedMushroom'],
+    'trophy': [
+        'TrophyDeer', 'TrophyBoar', 'TrophyGreydwarf', 'TrophyGreydwarfBrute',
+        'TrophyGreydwarfShaman', 'TrophySkeleton', 'TrophyTroll', 'TrophyEikthyr',
+        'TrophyTheElder', 'TrophyBonemass', 'TrophyDrake', 'TrophyDragonQueen',
+        'TrophyGoblinKing', 'TrophyTheQueen', 'TrophySerpent'
+    ],
+    'trophies': [
+        'TrophyDeer', 'TrophyBoar', 'TrophyGreydwarf', 'TrophyGreydwarfBrute',
+        'TrophyGreydwarfShaman', 'TrophySkeleton', 'TrophyTroll', 'TrophyEikthyr',
+        'TrophyTheElder', 'TrophyBonemass', 'TrophyDrake', 'TrophyDragonQueen',
+        'TrophyGoblinKing', 'TrophyTheQueen', 'TrophySerpent'
+    ],
+    'gems': ['Coins', 'Amber', 'AmberPearl', 'Ruby', 'SilverNecklace'],
+    'gem': ['Coins', 'Amber', 'AmberPearl', 'Ruby', 'SilverNecklace'],
+    'treasure': ['Coins', 'Amber', 'AmberPearl', 'Ruby', 'SilverNecklace'],
+}
+
+# Key craftable item recipe associations for misses/alternatives
+CRAFTING_RECIPES = {
+    'obsidian arrow': {'Obsidian': 4, 'Feathers': 2, 'Wood': 8},
+    'obsidian arrows': {'Obsidian': 4, 'Feathers': 2, 'Wood': 8},
+    'frost arrow': {'Obsidian': 4, 'FreezeGland': 1, 'Feathers': 2, 'Wood': 8},
+    'frost arrows': {'Obsidian': 4, 'FreezeGland': 1, 'Feathers': 2, 'Wood': 8},
+    'poison arrow': {'Obsidian': 4, 'Ooze': 2, 'Feathers': 2, 'Wood': 8},
+    'poison arrows': {'Obsidian': 4, 'Ooze': 2, 'Feathers': 2, 'Wood': 8},
+    'needle arrow': {'Needle': 4, 'Feathers': 2},
+    'needle arrows': {'Needle': 4, 'Feathers': 2},
+    'fire arrow': {'Wood': 8, 'Resin': 8, 'Feathers': 2},
+    'fire arrows': {'Wood': 8, 'Resin': 8, 'Feathers': 2},
+    'iron arrow': {'Iron': 1, 'Wood': 8, 'Feathers': 2},
+    'iron arrows': {'Iron': 1, 'Wood': 8, 'Feathers': 2},
+    'silver arrow': {'Silver': 1, 'Wood': 8, 'Feathers': 2},
+    'silver arrows': {'Silver': 1, 'Wood': 8, 'Feathers': 2},
+    'flint arrow': {'Flint': 2, 'Wood': 8, 'Feathers': 2},
+    'flint arrows': {'Flint': 2, 'Wood': 8, 'Feathers': 2},
+    'wood arrow': {'Wood': 8},
+    'wood arrows': {'Wood': 8},
+    'bone arrow': {'BoneFragments': 3, 'Wood': 8, 'Feathers': 2},
+    'bone arrows': {'BoneFragments': 3, 'Wood': 8, 'Feathers': 2},
+    'carapace arrow': {'Carapace': 4, 'Feathers': 2},
+    'carapace arrows': {'Carapace': 4, 'Feathers': 2},
+    'wolf armor': {'Silver': 20, 'WolfPelt': 5, 'WolfFang': 4, 'Chain': 1},
+    'frost mead': {'Honey': 10, 'Thistle': 5, 'Bloodbag': 2, 'GreydwarfEye': 1},
+    'poison mead': {'Honey': 10, 'Thistle': 5, 'NeckTail': 1, 'Coal': 10},
+    'healing mead': {'Honey': 10, 'Blueberries': 10, 'Raspberry': 10, 'Dandelion': 1},
+    'stamina mead': {'Honey': 10, 'Raspberry': 10, 'MushroomYellow': 10},
+}
+
+COMMON_SEARCH_ALIASES = {
+    'arow': 'arrow', 'arows': 'arrows', 'arroww': 'arrow', 'arrowws': 'arrows',
+    'obsidien': 'obsidian', 'obsidion': 'obsidian', 'obsid': 'obsidian',
+    'cooper': 'copper', 'copr': 'copper',
+    'broze': 'bronze', 'bronz': 'bronze',
+    'irn': 'iron', 'ironn': 'iron',
+    'silvr': 'silver', 'silve': 'silver',
+    'wod': 'wood', 'wodd': 'wood',
+    'stne': 'stone', 'ston': 'stone',
+    'posion': 'poison', 'poisen': 'poison',
+    'fether': 'feather', 'fethers': 'feathers',
+    'surting': 'surtling', 'surtin': 'surtling',
+    'serptent': 'serpent', 'serpant': 'serpent',
+    'dargon': 'dragon',
+    'shroom': 'mushroom', 'shrooms': 'mushrooms',
+    'pot': 'mead', 'pots': 'mead', 'potion': 'mead', 'potions': 'mead',
+    'resit': 'resist', 'resitance': 'resistance',
+    'needle': 'needle', 'nedle': 'needle',
+    'wolf': 'wolf', 'wlfe': 'wolf',
+    'flnt': 'flint',
+    'barli': 'barley',
+    'onon': 'onion',
+}
+
+def normalize_search_query(search_term):
+    clean_str = re.sub(r'[^a-zA-Z0-9\s]', ' ', str(search_term).lower()).strip()
+    raw_tokens = [t for t in clean_str.split() if t]
+    if not raw_tokens:
+        return '', []
     
-    results = {}
+    vocab = set(COMMON_SEARCH_ALIASES.keys()) | set(COMMON_SEARCH_ALIASES.values()) | set(CATEGORY_MAP.keys())
+    for k, val in ITEM_CATALOG.items():
+        vocab.add(k.lower())
+        for w in re.findall(r'[a-zA-Z]+', val[0].lower()):
+            if len(w) >= 3:
+                vocab.add(w)
+                
+    corrected_tokens = []
+    for t in raw_tokens:
+        if t in COMMON_SEARCH_ALIASES:
+            corrected_tokens.append(COMMON_SEARCH_ALIASES[t])
+        elif t in vocab:
+            corrected_tokens.append(t)
+        else:
+            matches = difflib.get_close_matches(t, list(vocab), n=1, cutoff=0.72)
+            if matches:
+                matched_word = matches[0]
+                corrected_tokens.append(COMMON_SEARCH_ALIASES.get(matched_word, matched_word))
+            else:
+                corrected_tokens.append(t)
+                
+    return ' '.join(corrected_tokens), corrected_tokens
+
+def get_find_report(search_term):
+    """
+    Intelligent fuzzy & category-fallback clan storage search engine.
+    Handles spelling mistakes, typo correction, and returns category alternatives
+    (e.g., all arrows in storage if obsidian arrows are missing).
+    """
+    if not search_term or not isinstance(search_term, str):
+        return "⚠️ *[Valheim Search]* Please provide an item to find (e.g. `!find arrows` or `!find obsidian`)."
+
+    search_clean = search_term.strip()
+    if len(search_clean) < 2:
+        return "⚠️ *[Valheim Search]* Search query too short. Please provide at least 2 characters."
+
+    totals, container_count = scan_world_inventory()
+    norm_str, tokens = normalize_search_query(search_clean)
+
+    # 1. Direct exact & token-subset match on in-stock items
+    direct_results = {}
     for k, count in totals.items():
         name = ITEM_CATALOG.get(k, (k,))[0]
-        if search_lower in k.lower() or search_lower in name.lower():
-            results[name] = count
-            
-    if not results:
-        return f"🔍 No items matching '{search_term}' found in clan storage (scanned {container_count} chests)."
-        
-    lines = [f"🔍 *Clan Storage Search:* '{search_term}'"]
-    for name, count in sorted(results.items(), key=lambda x: -x[1]):
-        lines.append(f"• {name}: {count}")
-    lines.append(f"\n_Scanned {container_count} chests._")
-    return "\n".join(lines)
+        name_clean = re.sub(r'^[^\w\s]+\s*', '', name)
+        k_lower = k.lower()
+        name_lower = name_clean.lower()
+        if (norm_str in k_lower or norm_str in name_lower or
+            (len(tokens) > 1 and all(t in name_lower or t in k_lower for t in tokens))):
+            direct_results[name] = count
+
+    # 2. Fuzzy match on in-stock items if direct matching is empty and query is single token
+    if not direct_results and len(tokens) == 1:
+        for k, count in totals.items():
+            name = ITEM_CATALOG.get(k, (k,))[0]
+            name_clean = re.sub(r'^[^\w\s]+\s*', '', name)
+            ratio = difflib.SequenceMatcher(None, norm_str, name_clean.lower()).ratio()
+            if ratio >= 0.72:
+                direct_results[name] = count
+
+    match_note = f" _(matched '{norm_str}')_" if norm_str and norm_str != search_clean.lower() else ""
+
+    if direct_results:
+        lines = [f"🔍 *Clan Storage Search:* '{search_clean}'{match_note}"]
+        for name, count in sorted(direct_results.items(), key=lambda x: -x[1]):
+            lines.append(f"• {name}: {count:,}")
+        lines.append(f"\n_Scanned {container_count} chests._")
+        return "\n".join(lines)
+
+    # 3. Fallback / Category matching (e.g. 'obsidian arrows' missed -> share all arrows & obsidian materials)
+    cat_items = {}
+    detected_cat = None
+    for t in tokens:
+        if t in CATEGORY_MAP:
+            detected_cat = t
+            for ck in CATEGORY_MAP[t]:
+                if ck in totals:
+                    cname = ITEM_CATALOG.get(ck, (ck,))[0]
+                    cat_items[cname] = totals[ck]
+
+    # Check for recipe crafting materials in stock
+    matched_recipe_mats = {}
+    for r_key, r_mats in CRAFTING_RECIPES.items():
+        r_tokens = r_key.split()
+        if all(rt in tokens or difflib.get_close_matches(rt, tokens, cutoff=0.8) for rt in r_tokens):
+            for mat_k, req in r_mats.items():
+                if mat_k in totals:
+                    mname = ITEM_CATALOG.get(mat_k, (mat_k,))[0]
+                    matched_recipe_mats[mname] = totals[mat_k]
+
+    if cat_items or matched_recipe_mats:
+        target_name = norm_str.title() if norm_str else search_clean.title()
+        lines = [f"🔍 *Clan Storage Search:* '{search_clean}'{match_note}"]
+        lines.append(f"⚠️ _No '{target_name}' found in chests._\n")
+
+        if cat_items:
+            cat_label = "Arrows" if "arrow" in (detected_cat or "") else (detected_cat.title() if detected_cat else "Related Items")
+            lines.append(f"🏹 *Available {cat_label} in Clan Storage:*")
+            for name, count in sorted(cat_items.items(), key=lambda x: -x[1]):
+                lines.append(f"• {name}: {count:,}")
+            lines.append("")
+
+        if matched_recipe_mats:
+            lines.append(f"⛏️ *Crafting Materials in Stock for {target_name}:*")
+            for name, count in sorted(matched_recipe_mats.items(), key=lambda x: -x[1]):
+                lines.append(f"• {name}: {count:,}")
+            lines.append("")
+
+        lines.append(f"_Scanned {container_count} chests._")
+        return "\n".join(lines)
+
+    return (
+        f"🔍 No items matching '{search_clean}' found in clan storage (scanned {container_count} chests).\n"
+        f"💡 _Tip: Try searching for a resource or category (e.g. `!find arrows`, `!find obsidian`, `!find mead`, `!find iron`)._"
+    )
 
