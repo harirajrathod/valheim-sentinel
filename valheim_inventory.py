@@ -236,7 +236,8 @@ def get_metal_report():
     if current_tier <= 4:
         wolf_sets = silver_bars // 40
         if wolf_sets > 0:
-            lines.append(f"• ❄️ *Wolf Armor:* ✅ {wolf_sets} set(s) craftable now from {silver_bars} Silver bars (40 Silver/set)!")
+            set_plural = "set" if wolf_sets == 1 else "sets"
+            lines.append(f"• ❄️ *Wolf Armor:* ✅ {wolf_sets} {set_plural} craftable now from {silver_bars} Silver bars (40 Silver/set)!")
         else:
             lines.append(f"• ❄️ *Wolf Armor:* {silver_bars}/40 Silver bars")
         lines.append(f"• ⚔️ *Silver Weapons:* {silver_bars} Silver bars ready for Silver Sword / Frostner")
@@ -245,7 +246,8 @@ def get_metal_report():
             lines.append(f"• 🌾 *Black Metal ({black_total} scrap):* Stockpiling for Blast Furnace (Plains)")
     elif current_tier >= 5:
         padded_possible = min(iron_bars // 10, linen // 20) if linen > 0 else 0
-        lines.append(f"• 🌾 *Padded Armor:* {padded_possible} piece(s) craftable ({linen} Linen, {iron_bars} Iron bars)")
+        piece_plural = "piece" if padded_possible == 1 else "pieces"
+        lines.append(f"• 🌾 *Padded Armor:* {padded_possible} {piece_plural} craftable ({linen} Linen, {iron_bars} Iron bars)")
         lines.append(f"• ⚔️ *Black Metal Weapons:* {black_scrap} scrap ready for Blast Furnace")
 
     # Flametal (Ashlands)
@@ -527,7 +529,8 @@ def get_armour_report():
         lines.append("• ❄️ *Wolf Armor Set* (Chest & Legs: 40 Silver + 10 Wolf Pelt + 4 Wolf Fang + 1 Chain)")
         if silver_bars >= 40 and wolf_pelt >= 10 and wolf_fang >= 4 and chain >= 1:
             craftable_sets = min(silver_bars // 40, wolf_pelt // 10, wolf_fang // 4, chain)
-            lines.append(f"  ✅ *Wolf Armor Chest & Legs craftable now!* ({craftable_sets} set(s) ready)")
+            c_set_plural = "set" if craftable_sets == 1 else "sets"
+            lines.append(f"  ✅ *Wolf Armor Chest & Legs craftable now!* ({craftable_sets} {c_set_plural} ready)")
         else:
             missing = []
             if silver_bars < 40: missing.append(f"{40-silver_bars} Silver")
@@ -546,7 +549,8 @@ def get_armour_report():
             lines.append("  ✅ *Full Padded Armor craftable now!*")
         elif linen > 0:
             pieces = min(linen // 20, iron_bars // 10)
-            lines.append(f"  → {pieces} piece(s) craftable now ({linen}/60 Linen).")
+            pieces_plural = "piece" if pieces == 1 else "pieces"
+            lines.append(f"  → {pieces} {pieces_plural} craftable now ({linen}/60 Linen).")
         else:
             lines.append("  ⏳ _Need Flax from Plains Fuling camps + Spinning Wheel._")
         lines.append("• ⚔️ *Black Metal Weapons* (Sword/Atgeir) — Smelt scrap at Blast Furnace")

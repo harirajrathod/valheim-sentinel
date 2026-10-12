@@ -589,8 +589,9 @@ def get_progression_report():
             lines.append(f"  ⏳ Still need: {', '.join(missing)}")
     elif current_tier >= 5:
         padded_possible = min(iron_bars // 10, linen // 20) if linen > 0 else 0
+        piece_plural = "piece" if padded_possible == 1 else "pieces"
         lines.append(f"  • Padded Armor (100 armor) — {linen} Linen Thread, {iron_bars} Iron bars")
-        lines.append(f"  • {padded_possible} piece(s) craftable now | Black Metal: {black_bars} bars + {black_scrap} scrap")
+        lines.append(f"  • {padded_possible} {piece_plural} craftable now | Black Metal: {black_bars} bars + {black_scrap} scrap")
 
     lines.append("")
 

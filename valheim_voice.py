@@ -411,9 +411,14 @@ RAID_SPEECH_LINES = {
     "wolves": "Hunters beware! You are being hunted! The wolf pack circles the clearing! Stand together!",
     "army_eikthyr": "Eikthyr rallies the beasts of the woods! Boars charge the gates! Stand firm!",
     "army_moder": "A freezing wind howls from the peaks! Mountain drakes descend upon our halls! Ready your bows!",
+    "army_goblin": "The goblin horde attacks! Fulings with torches swarm the perimeter! Protect the farm!",
     "army_yagluth": "The goblin horde attacks! Fulings with torches swarm the perimeter! Protect the farm!",
+    "army_queen": "They sought you out! Seekers and brood swarm from the mists! Brace your shields!",
+    "army_fader": "The Charred march! Ashlands legions surge with fire and bone! Extinguish their advance!",
     "skeletons": "Skeleton surprise! The undead rise from the soil! Smash them back into the earth!",
-    "surtlings": "A stench of sulfur in the air! Surtlings advance with fire! Extinguish the invaders!"
+    "surtlings": "A stench of sulfur in the air! Surtlings advance with fire! Extinguish the invaders!",
+    "bats": "You stirred the cauldron! A swarm of cave bats descends from the gloom! Swat them from the sky!",
+    "ghosts": "A cold chill runs down your spine! Spectres and wraiths glide from the darkness! Hold fast against the dead!"
 }
 
 def speak_raid_alert(
@@ -451,9 +456,14 @@ BOSS_NAMES = {
     "defeated_gdking": "The Elder of the Forest",
     "defeated_bonemass": "Bonemass of the Sunken Crypts",
     "defeated_moder": "Moder the Dragon Queen",
+    "defeated_dragon": "Moder the Dragon Queen",
+    "defeated_writhan": "Moder the Dragon Queen",
     "defeated_yagluth": "Yagluth the Goblin Sorcerer",
+    "defeated_goblinking": "Yagluth the Goblin Sorcerer",
     "defeated_queen": "The Seeker Queen of the Mistlands",
-    "defeated_fader": "Fader the Charred Titan"
+    "defeated_seekerking": "The Seeker Queen of the Mistlands",
+    "defeated_fader": "Fader the Charred Titan",
+    "defeated_fimbulbringer": "Kall Fimbulbringer of the Deep North"
 }
 
 def speak_boss_defeat(

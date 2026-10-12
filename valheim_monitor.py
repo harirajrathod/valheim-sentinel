@@ -742,6 +742,54 @@ def monitor() -> None:
             save_raid_state(False, {"last_raid": last_completed_raid})
             active_raid = None
 
+    def run_db_and_farm_checks() -> None:
+        nonlocal last_db_check_time
+        last_db_check_time = time.time()
+        try:
+            db_bosses = get_db2_defeated_bosses()
+            new_bosses = db_bosses - known_defeated
+            for b_key in new_bosses:
+                known_defeated.add(b_key)
+                save_known_defeated_bosses(known_defeated)
+                for p in active_names:
+                    if p in active_sessions:
+                        active_sessions[p]["bosses_defeated"].add(b_key)
+                msg = handle_boss_defeat(b_key, active_names)
+                print(f"Boss defeat triggered (db2): {b_key}")
+                send_whatsapp(msg)
+                try:
+                    from valheim_voice import speak_boss_defeat
+                    speak_boss_defeat(b_key, list(active_names))
+                except Exception as ve:
+                    print(f"[Monitor] Voice boss defeat proclamation skipped: {ve}", file=sys.stderr)
+
+            db_hildir = get_db2_hildir_quests()
+            new_hildir = db_hildir - known_hildir_quests
+            for q_key in new_hildir:
+                known_hildir_quests.add(q_key)
+                save_known_hildir_quests(known_hildir_quests)
+                loc_title, reward = HILDIR_QUEST_MAP.get(q_key, ("an ancient dungeon", "New wares"))
+                msg = (
+                    f"📦 *[Hildir's Request]* A lost brass chest from the *{loc_title}* was returned to *Hildir*!\n"
+                    f"• *Reward:* *{reward}* unlocked in her shop at the Meadows camp!"
+                )
+                print(f"Hildir quest completed: {q_key}")
+                send_whatsapp(msg)
+                try:
+                    from valheim_voice import speak_hildir_quest
+                    speak_hildir_quest(loc_title, reward)
+                except Exception as ve:
+                    print(f"[Monitor] Voice Hildir quest skipped: {ve}", file=sys.stderr)
+
+            # Check for Homestead Seed Cycle completion
+            try:
+                import valheim_farm
+                valheim_farm.check_and_announce_seed_cycle()
+            except Exception as e:
+                sys.stderr.write(f"[Monitor] Error checking farm seed cycle: {e}\n")
+        except Exception as ex:
+            sys.stderr.write(f"[Monitor] Error running db and farm checks: {ex}\n")
+
     # Handle clean termination
     def shutdown_handler(signum: int, frame: Any) -> None:
         print(f"Shutting down Valheim monitor cleanly on signal {signum}...")
@@ -773,6 +821,9 @@ def monitor() -> None:
     while True:
         now_curr = time.time()
         check_raid_completion(now_curr)
+
+        if now_curr - last_db_check_time > 60:
+            run_db_and_farm_checks()
 
         line = file.readline()
         if not line:
@@ -1074,51 +1125,10 @@ def monitor() -> None:
                 except Exception as ve:
                     print(f"[Monitor] Voice trader discovery skipped: {ve}", file=sys.stderr)
 
-        # World Save / Periodic check for boss defeat & Hildir quests in DB2
+        # World Save trigger for immediate DB2 check
         m_save = save_re.search(line)
-        if m_save or (time.time() - last_db_check_time > 60):
-            last_db_check_time = time.time()
-            db_bosses = get_db2_defeated_bosses()
-            new_bosses = db_bosses - known_defeated
-            for b_key in new_bosses:
-                known_defeated.add(b_key)
-                save_known_defeated_bosses(known_defeated)
-                for p in active_names:
-                    if p in active_sessions:
-                        active_sessions[p]["bosses_defeated"].add(b_key)
-                msg = handle_boss_defeat(b_key, active_names)
-                print(f"Boss defeat triggered (db2): {b_key}")
-                send_whatsapp(msg)
-                try:
-                    from valheim_voice import speak_boss_defeat
-                    speak_boss_defeat(b_key, list(active_names))
-                except Exception as ve:
-                    print(f"[Monitor] Voice boss defeat proclamation skipped: {ve}", file=sys.stderr)
-
-            db_hildir = get_db2_hildir_quests()
-            new_hildir = db_hildir - known_hildir_quests
-            for q_key in new_hildir:
-                known_hildir_quests.add(q_key)
-                save_known_hildir_quests(known_hildir_quests)
-                loc_title, reward = HILDIR_QUEST_MAP.get(q_key, ("an ancient dungeon", "New wares"))
-                msg = (
-                    f"📦 *[Hildir's Request]* A lost brass chest from the *{loc_title}* was returned to *Hildir*!\n"
-                    f"• *Reward:* *{reward}* unlocked in her shop at the Meadows camp!"
-                )
-                print(f"Hildir quest completed: {q_key}")
-                send_whatsapp(msg)
-                try:
-                    from valheim_voice import speak_hildir_quest
-                    speak_hildir_quest(loc_title, reward)
-                except Exception as ve:
-                    print(f"[Monitor] Voice Hildir quest skipped: {ve}", file=sys.stderr)
-
-            # Check for Homestead Seed Cycle completion
-            try:
-                import valheim_farm
-                valheim_farm.check_and_announce_seed_cycle()
-            except Exception as e:
-                sys.stderr.write(f"[Monitor] Error checking farm seed cycle: {e}\n")
+        if m_save:
+            run_db_and_farm_checks()
 
 
 if __name__ == "__main__":

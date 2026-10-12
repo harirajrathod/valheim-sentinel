@@ -35,6 +35,15 @@ def save_deaths(data):
     return atomic_save_json(DEATHS_HISTORY_FILE, data)
 
 def parse_iso_or_custom(ts_str):
+    if not ts_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        pass
     for fmt in ("%m/%d/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
         try:
             return datetime.strptime(ts_str, fmt).replace(tzinfo=timezone.utc)
@@ -57,7 +66,7 @@ def find_target_death(history, target_player=None, max_age_hours=36):
             continue
         if dt < cutoff:
             continue
-        if target_player and p_name.lower() != target_player.lower():
+        if target_player and format_player_name(p_name).lower() != format_player_name(target_player).lower():
             continue
         candidates.append((dt, k, v))
         
@@ -99,8 +108,8 @@ def record_cause(raw_text, sender=None, explicit_player=None):
                     detected_player = kp
                     break
 
-    if detected_player and detected_player.strip().lower() in ("musashi", "musashi(musa bhai)", "musa bhai"):
-        detected_player = "Musashi"
+    if detected_player:
+        detected_player = format_player_name(detected_player)
 
     # If no cause was given, list recent un-annotated deaths
     if not clean_cause:

@@ -672,6 +672,86 @@ class TestValheimVoice(unittest.TestCase):
         self.assertIsNone(vv.generate_voice(None))
 
 
+class TestValheimDeathCause(unittest.TestCase):
+    def test_find_target_death_name_normalization(self):
+        import valheim_record_death_cause as vdc
+        from datetime import datetime, timezone
+        now_str = datetime.now(timezone.utc).isoformat()
+        deaths = {
+            "d1": {"timestamp": now_str, "player": "Musashi(Musa Bhai)", "cause": "Combat fall"},
+            "d2": {"timestamp": now_str, "player": "Hilda", "cause": "Combat fall"},
+            "d3": {"timestamp": now_str, "player": "Dexter", "cause": "Combat fall"}
+        }
+        # Match using short name
+        target_id, target_data = vdc.find_target_death(deaths, "Musashi")
+        self.assertEqual(target_id, "d1")
+        self.assertEqual(target_data["player"], "Musashi(Musa Bhai)")
+
+        # Match using full formatted name
+        target_id2, target_data2 = vdc.find_target_death(deaths, "Musashi(Musa Bhai)")
+        self.assertEqual(target_id2, "d1")
+        self.assertEqual(target_data2["player"], "Musashi(Musa Bhai)")
+
+
+class TestValheimVoiceExpansion(unittest.TestCase):
+    def test_boss_names_coverage(self):
+        import valheim_voice as vv
+        for expected_key in [
+            "defeated_eikthyr", "defeated_gdking", "defeated_bonemass",
+            "defeated_moder", "defeated_dragon", "defeated_writhan",
+            "defeated_yagluth", "defeated_goblinking", "defeated_queen",
+            "defeated_seekerking", "defeated_fader", "defeated_fimbulbringer"
+        ]:
+            self.assertIn(expected_key, vv.BOSS_NAMES)
+            self.assertNotEqual(vv.BOSS_NAMES[expected_key], "The Forsaken Beast")
+
+    def test_raid_speech_lines_coverage(self):
+        import valheim_voice as vv
+        for expected_raid in [
+            "foresttrolls", "army_bonemass", "army_theelder", "wolves",
+            "army_eikthyr", "army_moder", "army_goblin", "army_yagluth",
+            "army_queen", "army_fader", "skeletons", "surtlings", "bats", "ghosts"
+        ]:
+            self.assertIn(expected_raid, vv.RAID_SPEECH_LINES)
+            self.assertTrue(len(vv.RAID_SPEECH_LINES[expected_raid]) > 10)
+
+
+class TestValheimPluralization(unittest.TestCase):
+    def test_quest_engine_pluralization(self):
+        import valheim_quest_engine as vqe
+        from unittest.mock import patch
+
+        # 1 active quest
+        mock_data_1 = {"active_quests": [{"id": "q1", "text": "Build outpost"}]}
+        with patch('valheim_quest_engine.load_quests', return_value=mock_data_1):
+            res = vqe.complete_quest(99, completed_by="Dexter")
+            self.assertIn("There is currently 1 active quest", res)
+            self.assertNotIn("quest(s)", res)
+
+            res_drop = vqe.drop_quest(99, dropped_by="Dexter")
+            self.assertIn("There is currently 1 active quest", res_drop)
+            self.assertNotIn("quest(s)", res_drop)
+
+        # 2 active quests
+        mock_data_2 = {"active_quests": [{"id": "q1", "text": "Task 1"}, {"id": "q2", "text": "Task 2"}]}
+        with patch('valheim_quest_engine.load_quests', return_value=mock_data_2):
+            res = vqe.complete_quest(99, completed_by="Dexter")
+            self.assertIn("There are currently 2 active quests", res)
+            self.assertNotIn("quest(s)", res)
+
+    def test_geography_chest_labels_pluralization(self):
+        import valheim_geography as vg
+        from unittest.mock import patch
+
+        mock_signs = [
+            {'clean_text': 'Iron Bars', 'creator': 'Hilda', 'pos': [0.0, 0.0, 0.0], 'raw_text': 'Iron Bars'}
+        ]
+        with patch('valheim_geography.get_world_signs', return_value=mock_signs):
+            report = vg.get_signs_report()
+            self.assertIn("1 chest label*", report)
+            self.assertNotIn("1 chest labels*", report)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

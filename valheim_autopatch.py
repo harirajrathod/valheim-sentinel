@@ -693,8 +693,9 @@ def check_and_run(cron_mode: bool = False, force: bool = False, dry_run: bool = 
 
     player_count, players = get_active_players()
     if player_count > 0 and not force:
-        pnames = ", ".join(players) if players else f"{player_count} player(s)"
-        log(f"Postponing update: {player_count} player(s) online ({pnames}).")
+        p_word = "player" if player_count == 1 else "players"
+        pnames = ", ".join(players) if players else f"{player_count} {p_word}"
+        log(f"Postponing update: {player_count} {p_word} online ({pnames}).")
 
         if dry_run:
             log(f"[DRY RUN] Would defer update for {player_count} active players ({pnames}).")

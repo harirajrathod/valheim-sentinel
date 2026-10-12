@@ -394,7 +394,11 @@ def check_and_announce_seed_cycle(force: bool = False, dry_run: bool = False) ->
 
     cooldown_ok = (time_since_announcement >= ANNOUNCEMENT_COOLDOWN_SEC)
 
-    should_announce = force or ((matured_transition or fresh_batch_ready) and cooldown_ok)
+    should_announce = force or (
+        (matured_transition or fresh_batch_ready)
+        and cooldown_ok
+        and farm['total_ready'] >= MIN_HARVEST_THRESHOLD
+    )
 
     # Save updated monitoring state
     new_state = {
@@ -406,7 +410,7 @@ def check_and_announce_seed_cycle(force: bool = False, dry_run: bool = False) ->
         'last_updated': now_t
     }
 
-    if force or (should_announce and farm['total_ready'] >= MIN_HARVEST_THRESHOLD):
+    if should_announce:
         msg = format_cycle_complete_announcement(farm)
         print(f"[valheim_farm] Seed cycle complete detected ({farm['total_ready']} ready)! Sending announcement...")
         if not dry_run:

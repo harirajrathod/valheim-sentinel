@@ -895,9 +895,11 @@ def complete_quest(index=1, completed_by="A Viking Warrior"):
         )
 
     if index < 1 or index > len(active):
+        q_count = len(active)
+        q_plural = f"is currently {q_count} active quest" if q_count == 1 else f"are currently {q_count} active quests"
         return (
             f"⚠️ *[Invalid Quest Number]*\n\n"
-            f"Quest #{index} does not exist. There are currently {len(active)} active quest(s).\n"
+            f"Quest #{index} does not exist. There {q_plural}.\n"
             f"💡 _Type `!quests` to see active quest numbers._"
         )
 
@@ -1006,9 +1008,11 @@ def drop_quest(index=1, dropped_by="A Viking Warrior"):
         )
 
     if index < 1 or index > len(active):
+        q_count = len(active)
+        q_plural = f"is currently {q_count} active quest" if q_count == 1 else f"are currently {q_count} active quests"
         return (
             f"⚠️ *[Invalid Quest Number]*\n\n"
-            f"Quest #{index} does not exist. There are currently {len(active)} active quest(s).\n"
+            f"Quest #{index} does not exist. There {q_plural}.\n"
             f"💡 _Type `!quests` to see active quest numbers, or type `!drop` to discard the latest quest._"
         )
 

@@ -386,6 +386,10 @@ def format_boss_assessment_message(boss_key, battle_data, day=None):
     w_count = len(warriors)
     day_str = f"Day {day}" if day else "the realm"
 
+    falls_hdr = f"{total_falls} Fall" if total_falls == 1 else f"{total_falls} Falls"
+    falls_str = f"{total_falls} combat fall" if total_falls == 1 else f"{total_falls} combat falls"
+    warriors_str = f"{w_count} warrior" if w_count == 1 else f"{w_count} warriors"
+
     lines = [
         f"🏆⚡ *VICTORY IN VALHEIM! THE FALL OF {boss_name.upper()}!* ⚡🏆",
         f"_{b_info['title']} Vanquished!_",
@@ -393,9 +397,9 @@ def format_boss_assessment_message(boss_key, battle_data, day=None):
         "🔥 *The Sacrificial Altar*",
         f"On {day_str}, deep within the {biome}, the offering of *{b_info['altar_item']}* was burned upon the ancient stone. The earth shuddered and *{boss_name}* arose in terrifying wrath!",
         "",
-        f"⚔️ *The {dur_mins}-Minute Meat Grinder ({total_falls} Falls)*",
+        f"⚔️ *The {dur_mins}-Minute Meat Grinder ({falls_hdr})*",
         f"• *Battle Duration:* ~{dur_mins} minutes ({time_range})",
-        f"• *Total Casualties:* {total_falls} combat falls across {w_count} warriors",
+        f"• *Total Casualties:* {falls_str} across {warriors_str}",
         "",
         "🩸 *Sacrifices & Battle Valor:*"
     ]

@@ -303,7 +303,7 @@ def generate_superlatives_report(days=7):
         top_def_count = max(raid_defense_counts.values())
         top_defenders = [p for p, c in raid_defense_counts.items() if c == top_def_count]
         def_names = " & ".join(f"*{format_player_name(p)}*" for p in sorted(top_defenders))
-        homestead_defender = (def_names, f"Stood guard during {top_def_count} base siege(s)")
+        homestead_defender = (def_names, f"Stood guard during {top_def_count} base siege{'s' if top_def_count != 1 else ''}")
 
     # The Night Owl (Midnight Raider: 00:00 - 06:00 IST)
     night_owl = None

@@ -591,7 +591,8 @@ def get_signs_report():
     if chest_count_by_loc:
         lines.append("📦 *Storage & Sorting Runes:*")
         for loc, count in chest_count_by_loc.most_common():
-            lines.append(f"• {loc}: *{count} chest labels* (Metals, Provisions, Armory)")
+            label_plural = "chest label" if count == 1 else "chest labels"
+            lines.append(f"• {loc}: *{count} {label_plural}* (Metals, Provisions, Armory)")
         lines.append("")
 
     lines.append("✍️ *Scribes of the Realm:*")

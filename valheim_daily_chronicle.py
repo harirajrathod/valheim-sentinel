@@ -949,7 +949,7 @@ def generate_chronicle(hours=24, save_story_to_master=False, dry_run=False):
         death_details = []
         if deaths:
             c_counts = Counter([p for _, p in deaths])
-            cas_str = ", ".join([f"{format_player_name(p)} ({cnt} combat falls)" for p, cnt in c_counts.items()]) + f" (Total: {len(deaths)} falls in 24h)"
+            cas_str = ", ".join([f"{format_player_name(p)} ({cnt} combat fall{'s' if cnt != 1 else ''})" for p, cnt in c_counts.items()]) + f" (Total: {len(deaths)} fall{'s' if len(deaths) != 1 else ''} in 24h)"
             for b in battle_events:
                 t = b.get("title", "")
                 bullets = " ".join(b.get("bullets", []))
