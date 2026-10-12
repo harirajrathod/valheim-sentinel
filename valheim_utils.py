@@ -120,6 +120,14 @@ def safe_load_json(file_path: str, default: Any = None) -> Any:
         return default
 
 
+def _json_default_serializer(obj: Any) -> Any:
+    if isinstance(obj, (set, frozenset)):
+        return sorted(list(obj))
+    if isinstance(obj, (datetime, )):
+        return obj.isoformat()
+    return str(obj)
+
+
 def atomic_save_json(file_path: str, data: Any, indent: int = 2) -> bool:
     """
     Atomically writes data as JSON to file_path using a temporary file and replace,
@@ -130,7 +138,7 @@ def atomic_save_json(file_path: str, data: Any, indent: int = 2) -> bool:
         os.makedirs(dir_name, exist_ok=True)
         fd, tmp_path = tempfile.mkstemp(prefix=".tmp_vh_", dir=dir_name, text=True)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=indent, ensure_ascii=False)
+            json.dump(data, f, indent=indent, ensure_ascii=False, default=_json_default_serializer)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, file_path)

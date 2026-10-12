@@ -64,6 +64,15 @@ class TestValheimUtils(unittest.TestCase):
             loaded = vu.safe_load_json(path)
             self.assertEqual(loaded, payload)
 
+            # Set and datetime serialization test
+            from datetime import datetime, timezone
+            payload_with_sets = {"players": {"Hilda", "Dexter"}, "timestamp": datetime(2026, 10, 12, 12, 0, 0, tzinfo=timezone.utc)}
+            success_set = vu.atomic_save_json(path, payload_with_sets)
+            self.assertTrue(success_set)
+            loaded_set = vu.safe_load_json(path)
+            self.assertEqual(loaded_set["players"], ["Dexter", "Hilda"])
+            self.assertEqual(loaded_set["timestamp"], "2026-10-12T12:00:00+00:00")
+
             # Corrupted file test
             with open(path, "w") as f:
                 f.write("{corrupt json ...")

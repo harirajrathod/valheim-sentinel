@@ -301,8 +301,19 @@ def load_known_hildir_quests() -> Set[str]:
     return keys
 
 
+def _serialize_raid_item(obj: Any) -> Any:
+    if isinstance(obj, (set, frozenset)):
+        return sorted(list(obj))
+    if isinstance(obj, dict):
+        return {k: _serialize_raid_item(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_serialize_raid_item(x) for x in obj]
+    return obj
+
+
 def save_raid_state(active: bool, data: Dict[str, Any]) -> None:
-    payload = {"active": active, **data}
+    clean_data = _serialize_raid_item(data)
+    payload = {"active": active, **clean_data}
     atomic_save_json(LAST_RAID_FILE, payload)
 
 
