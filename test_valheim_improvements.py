@@ -18,7 +18,9 @@ import tempfile
 import unittest
 import time
 
-sys.path.insert(0, "/root")
+REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+if REPO_DIR not in sys.path:
+    sys.path.insert(0, REPO_DIR)
 
 import valheim_utils as vu
 import valheim_whatsapp_action as vwa

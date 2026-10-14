@@ -124,7 +124,7 @@ bash scripts/install_server.sh
 bash scripts/start_server.sh
 
 # In a separate terminal or service, launch the real-time event sentinel
-python3 -m monitor.sentinel
+python3 valheim_monitor.py
 ```
 
 ---
@@ -134,25 +134,34 @@ python3 -m monitor.sentinel
 ### Auto-Patcher & Watchdog
 ```bash
 # Check if an official Steam update is available
-python3 -m core.autopatch --check
+python3 valheim_autopatch.py --check
 
 # Check current server status and active players
-python3 -m core.autopatch --status
+python3 valheim_autopatch.py --status
 
 # Cron-mode: patches if empty or updates watchdog
-python3 -m core.autopatch --cron
+python3 valheim_autopatch.py --cron
 
 # Force patch immediately
-python3 -m core.autopatch --force
+python3 valheim_autopatch.py --force
 ```
 
 ### Daily Battle Chronicle
 ```bash
 # Preview today's chronicle locally (dry-run)
-python3 -m skald.daily_chronicle --dry-run
+python3 valheim_daily_chronicle.py --dry-run
 
 # Broadcast 24h battle journal to Discord/Telegram/WhatsApp
-python3 -m skald.daily_chronicle --post
+python3 valheim_daily_chronicle.py --post
+```
+
+### Ecosystem Doctor & Diagnostics
+```bash
+# Full ecosystem diagnostic suite
+python3 valheim_doctor.py
+
+# Fast sanity check (<5s)
+python3 valheim_doctor.py --quick
 ```
 
 ---
@@ -163,10 +172,10 @@ Add the following to your `crontab -e`:
 
 ```cron
 # Check for updates or revive crashed server every 15 minutes
-*/15 * * * * cd /path/to/valheim-sentinel && /usr/bin/python3 -m core.autopatch --cron >> /var/log/valheim_cron.log 2>&1
+*/15 * * * * cd /path/to/valheim-sentinel && /usr/bin/python3 valheim_autopatch.py --cron >> /var/log/valheim_cron.log 2>&1
 
 # Post Daily Battle Chronicle every morning at 09:00 AM
-0 9 * * * cd /path/to/valheim-sentinel && /usr/bin/python3 -m skald.daily_chronicle --post >> /var/log/valheim_cron.log 2>&1
+0 9 * * * cd /path/to/valheim-sentinel && /usr/bin/python3 valheim_daily_chronicle.py --post >> /var/log/valheim_cron.log 2>&1
 ```
 
 ---
@@ -175,7 +184,9 @@ Add the following to your `crontab -e`:
 
 Run the built-in test suite:
 ```bash
-python3 -m unittest discover -s tests
+python3 test_valheim_improvements.py
+python3 test_valheim_farm.py
+python3 test_valheim_security.py
 ```
 
 ---

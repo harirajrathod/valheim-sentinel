@@ -170,70 +170,118 @@ def find_nearest_portal(target_x: float, target_z: float, portals: Optional[List
 
 def get_tames_report() -> str:
     """
-    Scans active world chunks for tamed creatures (Wolf, Boar, Lox),
-    extracting star ratings, health, custom names, and enclosure locations.
+    Scans active world chunks for tamed creatures (Wolf, Boar, Lox, and future tames),
+    extracting star ratings, health, custom names, and enclosure locations with zero ZDO bleed.
     """
     chunks = get_active_chunk_files()
-    animals = ["Wolf", "Boar", "Lox"]
-    tame_hash = struct.pack("<i", get_stable_hash("tamed"))
-    lvl_hash = struct.pack("<i", get_stable_hash("level"))
-    hlth_hash = struct.pack("<i", get_stable_hash("health"))
-    name_hash = struct.pack("<i", get_stable_hash("TamedName"))
+    portals = get_realm_portals()
 
-    tames_by_type = {"Wolf": [], "Boar": [], "Lox": []}
+    tame_h = struct.pack("<i", get_stable_hash("tamed"))
+    lvl_h = struct.pack("<i", get_stable_hash("level"))
+    hlth_h = struct.pack("<i", get_stable_hash("health"))
+    max_hlth_h = struct.pack("<i", get_stable_hash("max_health"))
+    name_h = struct.pack("<i", get_stable_hash("TamedName"))
 
-    for animal in animals:
-        h = struct.pack("<i", get_stable_hash(animal))
-        for c in chunks:
-            try:
-                with open(c, "rb") as f:
-                    data = f.read()
-            except Exception:
-                continue
+    animal_prefabs = [
+        ("Wolf", struct.pack("<i", get_stable_hash("Wolf")), 80.0),
+        ("Wolf_cub", struct.pack("<i", get_stable_hash("Wolf_cub")), 80.0),
+        ("Boar", struct.pack("<i", get_stable_hash("Boar")), 20.0),
+        ("Boar_piggy", struct.pack("<i", get_stable_hash("Boar_piggy")), 20.0),
+        ("Lox", struct.pack("<i", get_stable_hash("Lox")), 1000.0),
+        ("Lox_Calf", struct.pack("<i", get_stable_hash("Lox_Calf")), 100.0),
+        ("Lox_calf", struct.pack("<i", get_stable_hash("Lox_calf")), 100.0),
+        ("Hen", struct.pack("<i", get_stable_hash("Hen")), 10.0),
+        ("Chicken", struct.pack("<i", get_stable_hash("Chicken")), 10.0),
+        ("Asksvin", struct.pack("<i", get_stable_hash("Asksvin")), 1000.0),
+        ("Asksvin_hatchling", struct.pack("<i", get_stable_hash("Asksvin_hatchling")), 100.0),
+    ]
 
+    type_map = {
+        "Wolf": "Wolf", "Wolf_cub": "Wolf",
+        "Boar": "Boar", "Boar_piggy": "Boar",
+        "Lox": "Lox", "Lox_Calf": "Lox", "Lox_calf": "Lox",
+        "Hen": "Hen", "Chicken": "Hen",
+        "Asksvin": "Asksvin", "Asksvin_hatchling": "Asksvin",
+    }
+
+    tames_by_type = {"Wolf": [], "Boar": [], "Lox": [], "Hen": [], "Asksvin": []}
+
+    for c in chunks:
+        try:
+            with open(c, "rb") as f:
+                data = f.read()
+        except Exception:
+            continue
+
+        chunk_animals = []
+        for aname, ah, base_hp in animal_prefabs:
             idx = 0
             while True:
-                idx = data.find(h, idx)
+                idx = data.find(ah, idx)
                 if idx == -1:
                     break
                 if idx >= 12:
                     x, y, z = struct.unpack("<fff", data[idx-12:idx])
                     if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
                             and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
-                        bound = find_next_zdo_boundary(data, idx + 4, max_search=350)
-                        zdo = data[idx:bound]
-                        # Check if tamed
-                        if tame_hash in zdo or b"tamed" in zdo or b"Tamed" in zdo:
-                            level = 1
-                            if lvl_hash in zdo:
-                                p = zdo.find(lvl_hash) + 4
-                                if p + 4 <= len(zdo):
-                                    level = struct.unpack("<i", zdo[p:p+4])[0]
-                            health = 0.0
-                            if hlth_hash in zdo:
-                                p = zdo.find(hlth_hash) + 4
-                                if p + 4 <= len(zdo):
-                                    health = struct.unpack("<f", zdo[p:p+4])[0]
-                            tamed_name = ""
-                            if name_hash in zdo:
-                                p = zdo.find(name_hash) + 4
-                                if p + 2 <= len(zdo):
-                                    slen = zdo[p]
-                                    tamed_name = zdo[p+1:p+1+slen].decode("utf-8", errors="ignore").strip()
-
-                            tames_by_type[animal].append({
-                                "pos": (x, y, z),
-                                "level": level,
-                                "health": health,
-                                "name": tamed_name,
-                            })
+                        # Check tame_hash within 100 bytes of prefab
+                        t_pos = data.find(tame_h, idx)
+                        if t_pos != -1 and 0 < (t_pos - idx) < 100:
+                            chunk_animals.append((idx, aname, base_hp, x, y, z))
                 idx += 4
+
+        # Sort animals by chunk offset so search window never bleeds into adjacent creatures
+        chunk_animals.sort(key=lambda a: a[0])
+
+        for i, (idx, aname, base_hp, x, y, z) in enumerate(chunk_animals):
+            next_idx = chunk_animals[i+1][0] if i+1 < len(chunk_animals) else (idx + 300)
+            max_win = min(next_idx - idx, 280)
+            window = data[idx:idx+max_win]
+
+            # Level (within 180 bytes)
+            level = 1
+            l_pos = window.find(lvl_h)
+            if l_pos != -1 and l_pos < 180:
+                level = struct.unpack("<i", window[l_pos+4:l_pos+8])[0]
+
+            # Health: fallback to full max_health when health key is omitted (uninjured)
+            max_hp = base_hp * max(1, level)
+            m_pos = window.find(max_hlth_h)
+            if m_pos != -1 and m_pos < 60:
+                max_hp = struct.unpack("<f", window[m_pos+4:m_pos+8])[0]
+
+            cur_hp = max_hp
+            h_pos = window.find(hlth_h)
+            if h_pos != -1 and h_pos < 60:
+                cur_hp = struct.unpack("<f", window[h_pos+4:h_pos+8])[0]
+
+            # Custom Name
+            name = ""
+            n_pos = window.find(name_h)
+            if n_pos != -1:
+                slen = window[n_pos+4]
+                if 1 <= slen <= 40 and n_pos + 5 + slen <= len(window):
+                    name = window[n_pos+5:n_pos+5+slen].decode("utf-8", errors="ignore").strip()
+
+            parent_type = type_map.get(aname, aname)
+            if parent_type in tames_by_type:
+                tames_by_type[parent_type].append({
+                    "prefab": aname,
+                    "is_baby": aname in ("Wolf_cub", "Boar_piggy", "Lox_Calf", "Lox_calf", "Chicken", "Asksvin_hatchling"),
+                    "pos": (x, y, z),
+                    "level": level,
+                    "health": cur_hp,
+                    "max_health": max_hp,
+                    "name": name,
+                })
 
     wolves = tames_by_type["Wolf"]
     boars = tames_by_type["Boar"]
     loxes = tames_by_type["Lox"]
+    hens = tames_by_type["Hen"]
+    asksvins = tames_by_type["Asksvin"]
 
-    total_tames = len(wolves) + len(boars) + len(loxes)
+    total_tames = len(wolves) + len(boars) + len(loxes) + len(hens) + len(asksvins)
     if total_tames == 0:
         return "🐺 *[Valheim Menagerie]*\n\n_No tamed animals found in the realm yet! Feed boars mushrooms or wolves raw meat to begin taming._"
 
@@ -246,11 +294,12 @@ def get_tames_report() -> str:
 
     # Wolves Section
     if wolves:
-        two_star = sum(1 for w in wolves if w["level"] >= 3)
-        one_star = sum(1 for w in wolves if w["level"] == 2)
-        zero_star = sum(1 for w in wolves if w["level"] <= 1)
-        named = [w for w in wolves if w["name"]]
-        
+        adults = [w for w in wolves if not w["is_baby"]]
+        cubs = [w for w in wolves if w["is_baby"]]
+        two_star = sum(1 for w in adults if w["level"] >= 3)
+        one_star = sum(1 for w in adults if w["level"] == 2)
+        zero_star = sum(1 for w in adults if w["level"] <= 1)
+
         star_str = []
         if two_star > 0:
             star_str.append(f"{two_star}x ⭐⭐ 2-Star")
@@ -258,13 +307,17 @@ def get_tames_report() -> str:
             star_str.append(f"{one_star}x ⭐ 1-Star")
         if zero_star > 0:
             star_str.append(f"{zero_star}x Normal")
-        
-        lines.append(f"🐺 *Dire Wolves (Total: {len(wolves)})*")
-        lines.append(f"• *Tiers:* {', '.join(star_str) if star_str else 'Dire Pack'}")
-        if named:
-            named_strs = [f"*{w['name'].title()}* ({round(w['health'])} HP)" for w in named]
-            lines.append(f"• 🐕 *Named Companions:* {', '.join(named_strs)}")
-        
+
+        star_desc = ", ".join(star_str) if star_str else "Dire Pack"
+        if cubs:
+            lines.append(f"🐺 *Dire Wolves (Total: {len(adults)} Adults + {len(cubs)} Cubs)*")
+            lines.append(f"• *Tiers:* {star_desc}")
+            lines.append(f"• 🐾 *Cubs:* {len(cubs)}x Wolf Cub{'s' if len(cubs) > 1 else ''}")
+        else:
+            lines.append(f"🐺 *Dire Wolves (Total: {len(adults)} Adults)*")
+            lines.append(f"• *Tiers:* {star_desc}")
+            lines.append("• 🐾 *Cubs:* 0 cubs")
+
         # Distribution
         mb_wolves = sum(1 for w in wolves if math.hypot(w["pos"][0] - MAIN_BASE_COORDS[0], w["pos"][2] - MAIN_BASE_COORDS[1]) < 100)
         outpost_wolves = len(wolves) - mb_wolves
@@ -278,10 +331,11 @@ def get_tames_report() -> str:
 
     # Boars Section
     if boars:
-        two_star = sum(1 for b in boars if b["level"] >= 3)
-        one_star = sum(1 for b in boars if b["level"] == 2)
-        zero_star = sum(1 for b in boars if b["level"] <= 1)
-        named = [b for b in boars if b["name"]]
+        adults = [b for b in boars if not b["is_baby"]]
+        piglets = [b for b in boars if b["is_baby"]]
+        two_star = sum(1 for b in adults if b["level"] >= 3)
+        one_star = sum(1 for b in adults if b["level"] == 2)
+        zero_star = sum(1 for b in adults if b["level"] <= 1)
 
         star_str = []
         if two_star > 0:
@@ -291,30 +345,74 @@ def get_tames_report() -> str:
         if zero_star > 0:
             star_str.append(f"{zero_star}x Normal")
 
-        lines.append(f"🐗 *Boars (Total: {len(boars)})*")
-        lines.append(f"• *Tiers:* {', '.join(star_str)}")
-        if named:
-            named_strs = [f"*{b['name'].title()}*" for b in named]
-            lines.append(f"• 🐖 *Named:* {', '.join(named_strs)}")
+        star_desc = ", ".join(star_str) if star_str else "Swine Herd"
+        if piglets:
+            lines.append(f"🐗 *Boars (Total: {len(adults)} Adults + {len(piglets)} Piglets)*")
+            lines.append(f"• *Tiers:* {star_desc}")
+            lines.append(f"• 🐾 *Piglets:* {len(piglets)}x Piglet{'s' if len(piglets) > 1 else ''}")
+        else:
+            lines.append(f"🐗 *Boars (Total: {len(adults)} Adults)*")
+            lines.append(f"• *Tiers:* {star_desc}")
+            lines.append("• 🐾 *Piglets:* 0 piglets")
 
         mb_boars = sum(1 for b in boars if math.hypot(b["pos"][0] - MAIN_BASE_COORDS[0], b["pos"][2] - MAIN_BASE_COORDS[1]) < 100)
         farm_boars = len(boars) - mb_boars
         distrib = []
-        if farm_boars > 0:
-            distrib.append(f"{farm_boars} at East Farm (Bacon Factory)")
         if mb_boars > 0:
             distrib.append(f"{mb_boars} at Homestead Pen")
+        if farm_boars > 0:
+            distrib.append(f"{farm_boars} at East Farm (Bacon Factory)")
         lines.append(f"• 📍 *Pens:* {', '.join(distrib)}")
         lines.append("")
 
     # Lox Section
     if loxes:
-        named = [l for l in loxes if l["name"]]
-        lines.append(f"🦣 *Lox Herds (Total: {len(loxes)})*")
-        if named:
-            named_strs = [f"*{l['name']}* ({round(l['health'])} HP)" for l in named]
-            lines.append(f"• 🦣 *Named Herd:* {', '.join(named_strs)}")
-        lines.append("• 📍 *Pasture:* Plains FOB (~5.4km NNE)")
+        adults = [l for l in loxes if not l["is_baby"]]
+        calves = [l for l in loxes if l["is_baby"]]
+        if calves:
+            lines.append(f"🦣 *Lox Herds (Total: {len(adults)} Adults + {len(calves)} Calves)*")
+            lines.append(f"• 🐾 *Calves:* {len(calves)}x Lox Calves")
+        else:
+            lines.append(f"🦣 *Lox Herds (Total: {len(adults)} Adults)*")
+            lines.append("• 🐾 *Calves:* 0 calves")
+
+        # Geographic distribution across Plains outposts
+        fob_lox = sum(1 for l in adults if math.hypot(l["pos"][0] - 2480, l["pos"][2] - 4430) < 200)
+        tallrock_lox = sum(1 for l in adults if math.hypot(l["pos"][0] - 2630, l["pos"][2] - 4820) < 200)
+        north_lox = len(adults) - fob_lox - tallrock_lox
+        lox_distrib = []
+        if fob_lox > 0:
+            fob_str = f"{fob_lox} adults"
+            if calves:
+                fob_str += f" + {len(calves)} calves"
+            lox_distrib.append(f"{fob_str} at Plains FOB (`rtb`)")
+        if tallrock_lox > 0:
+            lox_distrib.append(f"{tallrock_lox} at Tall Rock Outpost")
+        if north_lox > 0:
+            lox_distrib.append(f"{north_lox} in North Plains Range")
+        lines.append(f"• 📍 *Herds:* {', '.join(lox_distrib) if lox_distrib else 'Plains Outposts'}")
+        lines.append("")
+
+    # Optional Hen / Chicken Section
+    if hens:
+        adults = [h for h in hens if not h["is_baby"]]
+        chicks = [h for h in hens if h["is_baby"]]
+        if chicks:
+            lines.append(f"🐔 *Hens & Chickens (Total: {len(adults)} Adults + {len(chicks)} Chicks)*")
+            lines.append(f"• 🐣 *Chicks:* {len(chicks)}x Chick{'s' if len(chicks) > 1 else ''}")
+        else:
+            lines.append(f"🐔 *Hens (Total: {len(adults)} Adults)*")
+        lines.append("")
+
+    # Optional Asksvin Section
+    if asksvins:
+        adults = [a for a in asksvins if not a["is_baby"]]
+        hatchlings = [a for a in asksvins if a["is_baby"]]
+        if hatchlings:
+            lines.append(f"🦎 *Asksvin (Total: {len(adults)} Adults + {len(hatchlings)} Hatchlings)*")
+            lines.append(f"• 🐾 *Hatchlings:* {len(hatchlings)}x Hatchling{'s' if len(hatchlings) > 1 else ''}")
+        else:
+            lines.append(f"🦎 *Asksvin Packs (Total: {len(adults)} Adults)*")
         lines.append("")
 
     lines.append("💡 *Tip:* Stock pens with Carrots, Turnips, or Cloudberries to keep herds fed & breeding! 🌾")

@@ -13,7 +13,9 @@ import sys
 import unittest
 import urllib.request
 
-sys.path.insert(0, "/root")
+REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+if REPO_DIR not in sys.path:
+    sys.path.insert(0, REPO_DIR)
 from valheim_utils import safe_urlopen
 import valheim_inventory
 import valheim_voice

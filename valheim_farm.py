@@ -427,7 +427,7 @@ def check_and_announce_seed_cycle(force: bool = False, dry_run: bool = False) ->
 
 def main():
     parser = argparse.ArgumentParser(description="Valheim Farm & Seed Cycle Tracker")
-    parser.add_argument("--report", action="store_true", help="Print farm status report for WhatsApp")
+    parser.add_argument("--report", "--farm", action="store_true", help="Print farm status report for WhatsApp")
     parser.add_argument("--check", action="store_true", help="Check for seed cycle completion")
     parser.add_argument("--force-announce", action="store_true", help="Force send harvest announcement")
     parser.add_argument("--dry-run", action="store_true", help="Simulate without network calls or state mutations")
