@@ -5,10 +5,6 @@ Records and updates casualty causes in /root/valheim_deaths_history.json.
 Invoked via WhatsApp command (!died, !rip, !death) or directly via CLI.
 """
 
-import os
-import sys
-import json
-import re
 import argparse
 from datetime import datetime, timezone, timedelta
 
@@ -129,7 +125,7 @@ def record_cause(raw_text, sender=None, explicit_player=None):
 
     if not target_entry:
         return (
-            f"⚠️ *[Valheim]* No recent death records found in the last 36 hours"
+            "⚠️ *[Valheim]* No recent death records found in the last 36 hours"
             + (f" for *{format_player_name(detected_player)}*." if detected_player else ".")
         )
 

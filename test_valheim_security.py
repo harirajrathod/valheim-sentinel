@@ -12,6 +12,7 @@ import os
 import sys
 import unittest
 import urllib.request
+import urllib.parse
 
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 if REPO_DIR not in sys.path:

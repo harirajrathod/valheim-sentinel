@@ -293,37 +293,9 @@ def send_voice_to_whatsapp(
 ) -> bool:
     """
     Dispatches an audio file to the WhatsApp group via Hermes gateway /send-media.
-    The bridge automatically converts the audio to Opus OGG and delivers it as
-    a native playable WhatsApp Voice Bubble (PTT).
+    NOTE: All non-9am audio publishing is stopped per user directive.
     """
-    if not file_path or not os.path.exists(file_path):
-        sys.stderr.write(f"[valheim_voice] Cannot dispatch: audio file not found {file_path}\n")
-        return False
-
-    media_endpoint = bridge_url.replace("/send", "/send-media")
-    payload = {
-        "chatId": chat_id,
-        "filePath": os.path.abspath(file_path),
-        "mediaType": "audio"
-    }
-    encoded = json.dumps(payload).encode("utf-8")
-
-    for attempt in range(1, retries + 2):
-        try:
-            req = urllib.request.Request(
-                media_endpoint,
-                data=encoded,
-                headers={"Content-Type": "application/json"}
-            )
-            with safe_urlopen(req, timeout=timeout) as resp:
-                if 200 <= resp.status < 300:
-                    print(f"[valheim_voice] Successfully dispatched voice note to {chat_id}")
-                    return True
-        except Exception as e:
-            sys.stderr.write(f"[valheim_voice] Dispatch attempt {attempt} failed: {e}\n")
-            if attempt <= retries:
-                time.sleep(1.5)
-
+    sys.stderr.write("[valheim_voice] Audio publishing to WhatsApp is stopped per user directive (only morning 9am VALHALLA FM permitted).\n")
     return False
 
 
@@ -334,22 +306,10 @@ def speak_to_whatsapp(
     auto_cleanup: bool = True
 ) -> bool:
     """
-    End-to-end helper: synthesizes speech and immediately posts it
-    as a WhatsApp voice bubble. Cleans up temporary audio file on completion.
+    NOTE: All non-9am audio publishing is stopped per user directive.
     """
-    audio_path = generate_voice(text, character=character)
-    if not audio_path:
-        return False
-
-    try:
-        success = send_voice_to_whatsapp(audio_path, chat_id=chat_id)
-        return success
-    finally:
-        if auto_cleanup and os.path.exists(audio_path):
-            try:
-                os.remove(audio_path)
-            except Exception:
-                pass
+    sys.stderr.write("[valheim_voice] speak_to_whatsapp is stopped per user directive (only morning 9am VALHALLA FM permitted).\n")
+    return False
 
 
 # --- Feature 2: Daily Chronicle Narration ---

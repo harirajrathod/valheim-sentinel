@@ -710,12 +710,6 @@ def monitor() -> None:
             msg_tg = get_session_leave_message(name, event_type, summary, target="telegram")
             send_telegram(msg_tg)
         send_whatsapp(msg_wa)
-        if event_type in ("RAGE_QUIT", "CORPSE_RUN_FAIL", "SEA_CASUALTY"):
-            try:
-                from valheim_voice import speak_eulogy
-                speak_eulogy(name, event_type)
-            except Exception as ve:
-                print(f"[Monitor] Voice eulogy skipped: {ve}", file=sys.stderr)
 
     def check_raid_completion(now_t: float, force: bool = False) -> None:
         nonlocal active_raid, last_completed_raid
@@ -732,11 +726,6 @@ def monitor() -> None:
             msg = format_raid_victory_message(key, defenders, sacrifices, duration_seconds=dur)
             print(f"Raid victory shout triggered: {key} (defenders: {defenders}, sacrifices: {sacrifices}, duration: {dur}s)")
             send_whatsapp(msg)
-            try:
-                from valheim_voice import speak_raid_victory
-                speak_raid_victory(key, flawless=(len(sacrifices) == 0), defenders=list(defenders))
-            except Exception as ve:
-                print(f"[Monitor] Voice raid victory skipped: {ve}", file=sys.stderr)
 
             last_completed_raid = {
                 "key": key,
@@ -768,11 +757,6 @@ def monitor() -> None:
                 msg = handle_boss_defeat(b_key, active_names)
                 print(f"Boss defeat triggered (db2): {b_key}")
                 send_whatsapp(msg)
-                try:
-                    from valheim_voice import speak_boss_defeat
-                    speak_boss_defeat(b_key, list(active_names))
-                except Exception as ve:
-                    print(f"[Monitor] Voice boss defeat proclamation skipped: {ve}", file=sys.stderr)
 
             db_hildir = get_db2_hildir_quests()
             new_hildir = db_hildir - known_hildir_quests
@@ -786,11 +770,6 @@ def monitor() -> None:
                 )
                 print(f"Hildir quest completed: {q_key}")
                 send_whatsapp(msg)
-                try:
-                    from valheim_voice import speak_hildir_quest
-                    speak_hildir_quest(loc_title, reward)
-                except Exception as ve:
-                    print(f"[Monitor] Voice Hildir quest skipped: {ve}", file=sys.stderr)
 
             # Check for Homestead Seed Cycle completion
             try:
@@ -1029,11 +1008,6 @@ def monitor() -> None:
                 msg = format_raid_alert(raid_key, active_names, jcode)
                 print(f"Raid alert triggered: {raid_key} (defenders: {active_names})")
                 send_whatsapp(msg)
-                try:
-                    from valheim_voice import speak_raid_alert
-                    speak_raid_alert(raid_key, list(active_names))
-                except Exception as ve:
-                    print(f"[Monitor] Voice raid alert skipped: {ve}", file=sys.stderr)
 
                 spawn_dur = RAID_SPAWN_DURATIONS.get(raid_key, 120)
                 nominal_dur = spawn_dur + MOPUP_BUFFER
@@ -1074,11 +1048,6 @@ def monitor() -> None:
                 msg = handle_boss_defeat(boss_key, active_names)
                 print(f"Boss defeat triggered (log): {boss_key}")
                 send_whatsapp(msg)
-                try:
-                    from valheim_voice import speak_boss_defeat
-                    speak_boss_defeat(boss_key, list(active_names))
-                except Exception as ve:
-                    print(f"[Monitor] Voice boss defeat proclamation skipped: {ve}", file=sys.stderr)
             continue
 
         # Location / Dungeon Discovery & Sea Voyage Detection
@@ -1110,11 +1079,6 @@ def monitor() -> None:
                         msg = f"{icon} *[Realm Discovery]* {msg_text} (Found by *{finder}*)"
                         print(f"POI discovered: {loc_name}")
                         send_whatsapp(msg)
-                        try:
-                            from valheim_voice import speak_poi_discovery
-                            speak_poi_discovery(poi_key, finder)
-                        except Exception as ve:
-                            print(f"[Monitor] Voice POI discovery skipped: {ve}", file=sys.stderr)
                     break
 
             # Real-Time Trader Discovery Alert
@@ -1130,11 +1094,6 @@ def monitor() -> None:
                 )
                 print(f"Trader discovered: {loc_name}")
                 send_whatsapp(msg)
-                try:
-                    from valheim_voice import speak_discovery
-                    speak_discovery(t_name, t_biome, finder)
-                except Exception as ve:
-                    print(f"[Monitor] Voice trader discovery skipped: {ve}", file=sys.stderr)
 
         # World Save trigger for immediate DB2 check
         m_save = save_re.search(line)

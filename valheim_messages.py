@@ -4,8 +4,6 @@
 
 import random
 import re
-import os
-import json
 import sys
 
 sys.path.insert(0, "/root")
@@ -420,14 +418,6 @@ MACRO_ROASTS = {
         ]
     }
 }
-
-
-def format_player_name(name: str) -> str:
-    if not name:
-        return ""
-    if name.strip().lower() in ("musashi", "musashi(musa bhai)", "musa bhai"):
-        return "Musashi(Musa Bhai)"
-    return name
 
 
 def get_random_join_message(name: str, target: str = "whatsapp") -> str:

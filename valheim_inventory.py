@@ -1,27 +1,15 @@
 import os
 import sys
 import time
-import math
 import re
-import glob
-import json
-import zlib
 import struct
-import ctypes
-import argparse
-import subprocess
 import difflib
-from datetime import datetime, timedelta, timezone
 from itertools import combinations
 
 sys.path.insert(0, '/root')
 from valheim_utils import (
-    LOG_FILE,
-    IST,
-    format_player_name,
     safe_load_json,
     atomic_save_json,
-    get_stable_hash,
     get_active_chunk_files,
 )
 
@@ -126,7 +114,7 @@ def get_wealth_report():
         lines.append(f"  ├ {'✅' if net_worth >= 350 else '❌'} *Fishing Rod & 50 Bait*: 350g")
         lines.append(f"  └ {'✅' if net_worth >= 120 else '❌'} *Ymir Flesh*: 120g (Can buy {net_worth // 120})")
     elif h_info.get('discovered'):
-        lines.append(f"• 🪙 *Haldor* (Black Forest • ⏳ Discovered, needs portal link)")
+        lines.append("• 🪙 *Haldor* (Black Forest • ⏳ Discovered, needs portal link)")
     else:
         lines.append("• 🪙 *Haldor* (Black Forest • 🔒 Undiscovered)")
 
@@ -137,9 +125,9 @@ def get_wealth_report():
         q_count = len(hi_info.get('quests', []))
         lines.append(f"• 👗 *Hildir* (Meadows • Portal: {p_str})")
         lines.append(f"  ├ 🎯 *Quests:* {q_count}/3 Brass Chests recovered")
-        lines.append(f"  └ ℹ️ *Wares:* Vanity Apparel & Fireworks unlocked")
+        lines.append("  └ ℹ️ *Wares:* Vanity Apparel & Fireworks unlocked")
     elif hi_info.get('discovered'):
-        lines.append(f"• 👗 *Hildir* (Meadows • ⏳ Discovered, needs portal link)")
+        lines.append("• 👗 *Hildir* (Meadows • ⏳ Discovered, needs portal link)")
     else:
         lines.append("• 👗 *Hildir* (Meadows • 🔒 Undiscovered)")
 
@@ -148,9 +136,9 @@ def get_wealth_report():
     if bw_info.get('interacted'):
         p_str = f"`{bw_info['portal']}`" if bw_info.get('portal') else "No Portal"
         lines.append(f"• 🧙‍♀️ *The Bog Witch* (Swamp • Portal: {p_str})")
-        lines.append(f"  └ ℹ️ *Wares:* Alchemy Draughts, Cauldron Spices & Reaping Scythe")
+        lines.append("  └ ℹ️ *Wares:* Alchemy Draughts, Cauldron Spices & Reaping Scythe")
     elif bw_info.get('discovered'):
-        lines.append(f"• 🧙‍♀️ *The Bog Witch* (Swamp • ⏳ Discovered, needs portal link)")
+        lines.append("• 🧙‍♀️ *The Bog Witch* (Swamp • ⏳ Discovered, needs portal link)")
     else:
         lines.append("• 🧙‍♀️ *The Bog Witch* (Swamp • 🔒 Undiscovered)")
 
@@ -261,10 +249,10 @@ def get_metal_report():
     lines.append("")
     lines.append("🪵 *Smelting Infrastructure & Fuel:*")
     lines.append(f"• *Raw Ores/Scrap to Smelt:* {raw_ores} ({cop_ore} Cu + {tin_ore} Sn + {iron_scrap + iron_ore} Iron + {silver_ore} Silver)")
-    lines.append(f"• *Coal Required:* ~{coal_needed} Coal (~{coal_needed * 2} Wood in Charcoal Kiln)")
+    lines.append(f"• *Coal Stock:* {coal} | *Coal Required:* ~{coal_needed} (~{coal_needed * 2} Wood in Charcoal Kiln)")
     lines.append(f"• *Surtling Cores:* {cores} ({'✅ Ready for new station' if cores >= 5 else f'⏳ Need {5-cores} more for Smelter/Kiln'})")
     if black_scrap > 0 and current_tier >= 4:
-        lines.append(f"• *Blast Furnace:* Required to smelt Black Metal Scrap (needs Artisan Table + Dragon Tear)")
+        lines.append("• *Blast Furnace:* Required to smelt Black Metal Scrap (needs Artisan Table + Dragon Tear)")
 
     return "\n".join(lines)
 
@@ -463,19 +451,9 @@ def get_armour_report():
     # ── Material stock ────────────────────────────────────────────────────────
     troll_hide   = totals.get('TrollHide', 0)
     deer_hide    = totals.get('DeerHide', 0)
-    leather      = totals.get('LeatherScraps', 0)
-    bones        = totals.get('BoneFragments', 0)
     roots        = totals.get('Root', 0)
-    bark         = totals.get('AncientBark', 0)
     chain        = totals.get('Chain', 0)
     chitin       = totals.get('Chitin', 0)
-
-    cop_bars     = totals.get('Copper', 0)
-    tin_bars     = totals.get('Tin', 0)
-    bronze_bars  = totals.get('Bronze', 0)
-    imm_bronze   = bronze_bars + min(cop_bars // 2, tin_bars)
-    max_bronze   = bronze_bars + min((cop_bars + totals.get('CopperOre', 0)) // 2,
-                                     tin_bars + totals.get('TinOre', 0))
 
     iron_bars    = totals.get('Iron', 0)
     iron_scrap   = totals.get('IronScrap', 0) + totals.get('IronOre', 0)

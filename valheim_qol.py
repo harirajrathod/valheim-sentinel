@@ -21,35 +21,19 @@ Features:
 Zero skill-shaming: Strictly positive, cooperative, high-utility assistance for the Viking clan.
 """
 
-import os
 import sys
 import math
-import time
-import glob
-import re
 import struct
-import ctypes
 import argparse
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Tuple, List, Optional, Set
+from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, "/root")
-from valheim_utils import (
-    LOG_FILE,
-    VALHEIM_WHATSAPP_GROUP,
-    IST,
-    safe_load_json,
-    atomic_save_json,
-    format_player_name,
-    safe_format_template,
-)
 from valheim_farm import get_stable_hash, get_active_chunk_files
 from valheim_info import (
     find_next_zdo_boundary,
     scan_world_inventory,
     get_portal_location_desc,
     get_progression_state,
-    get_traders_status,
     get_world_signs,
 )
 
@@ -174,7 +158,6 @@ def get_tames_report() -> str:
     extracting star ratings, health, custom names, and enclosure locations with zero ZDO bleed.
     """
     chunks = get_active_chunk_files()
-    portals = get_realm_portals()
 
     tame_h = struct.pack("<i", get_stable_hash("tamed"))
     lvl_h = struct.pack("<i", get_stable_hash("level"))
@@ -856,12 +839,10 @@ def get_craft_report(item_query: Optional[str] = None) -> str:
     # Match recipe
     norm_q = item_query.strip().lower()
     recipe = None
-    target_key = None
 
     for r_key, r_data in RECIPE_CATALOG.items():
         if norm_q == r_key or norm_q in r_key or r_key in norm_q:
             recipe = r_data
-            target_key = r_key
             break
 
     if not recipe:
@@ -1161,7 +1142,7 @@ def get_comfort_report() -> str:
     lines = [
         "🔥 *LONGHOUSE HEARTH & COMFORT GAUGE* 🛏️",
         "",
-        f"Homestead Rested Buff Status (Main Base Longhouse):",
+        "Homestead Rested Buff Status (Main Base Longhouse):",
         "",
         f"🛋️ *Current Comfort Level:* **Comfort {total_comfort}**",
         f"⏱️ *Rested Buff Duration:* **{rested_mins} Minutes**",

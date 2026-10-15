@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from valheim_utils import get_stable_hash, safe_send_whatsapp
 """
 /root/valheim_weekly_sync.py
 Automated Weekly Valheim Exploration, Trader & Progress Synchronization Engine.
@@ -23,11 +22,11 @@ import re
 import json
 import glob
 import zlib
-import struct
-import ctypes
 import argparse
 import subprocess
 from datetime import datetime, timezone, timedelta
+
+from valheim_utils import safe_send_whatsapp
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -107,7 +106,7 @@ def run_weekly_sync(dry_run=False):
                 "BlackMetalTotal": black_metal,
                 "Obsidian": obsidian
             }
-            print(f"✓ Key Stockpiles Audited:")
+            print("✓ Key Stockpiles Audited:")
             print(f"  • Yagluth Summon (Fuling Totems): {goblin_totems}/5 ({'🔥 Ready' if goblin_totems >= 5 else 'Need more'})")
             print(f"  • Treasury: {coins} Coins, {rubies} Rubies, {amber} Amber")
             print(f"  • Metallurgy: {iron} Iron, {silver} Silver, {cop} Copper, {tin} Tin, {brz} Bronze, {obsidian} Obsidian")
@@ -117,7 +116,7 @@ def run_weekly_sync(dry_run=False):
                 from valheim_quest_engine import check_quest_inventory_completion
                 completed_msgs = check_quest_inventory_completion(totals)
                 for cmsg in completed_msgs:
-                    print(f"✓ Quest Auto-Completed by Vault Stockpiles!")
+                    print("✓ Quest Auto-Completed by Vault Stockpiles!")
                     try:
                         safe_send_whatsapp(cmsg)
                     except Exception as wa_err:
@@ -267,7 +266,7 @@ def main():
             ("DragonEgg", 3, "defeated_dragon", "Moder"),
             ("GoblinTotem", 5, "defeated_goblinking", "Yagluth"),
             ("SealbreakerFragment", 9, "defeated_queen", "The Queen"),
-            ("BellFragment", 3, "defeated_fader", "Fader")
+            ("BellFragment", 3, "defeated_fader", "Fader"),
         ]
         prev_stock = prev_audit.get("key_stockpiles", {})
         curr_stock = audit.get("key_stockpiles", {})

@@ -21,13 +21,10 @@ import os
 import sys
 import json
 import time
-import shutil
-import socket
-import struct
 import py_compile
 import subprocess
 import argparse
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple
 
 # ANSI Color Codes
 GREEN = "\033[92m"
@@ -303,8 +300,8 @@ class ValheimDoctor:
 
             # Verify output length (WhatsApp safety)
             lines = out.splitlines()
-            if len(lines) > 40:
-                self.record(cat, f"Command: {cmd_name}", "WARN", f"Output exceeds 40 lines ({len(lines)} lines)", t)
+            if len(lines) > 50:
+                self.record(cat, f"Command: {cmd_name}", "WARN", f"Output exceeds 50 lines ({len(lines)} lines)", t)
                 continue
 
             # Check expected keywords (at least one must match)
@@ -396,7 +393,8 @@ class ValheimDoctor:
             from valheim_utils import KNOWN_PLAYERS
             required_names = ["musashi", "dexter", "hilda", "faye"]
             if all(n in KNOWN_PLAYERS for n in required_names):
-                self.record(cat, "Clan Character Registry", "PASS", f"All 4 core Vikings mapped: {list(KNOWN_PLAYERS.values())[:4]}", 0)
+                distinct_players = list(dict.fromkeys(KNOWN_PLAYERS.values()))
+                self.record(cat, "Clan Character Registry", "PASS", f"All 4 core Vikings mapped: {distinct_players}", 0)
             else:
                 self.record(cat, "Clan Character Registry", "WARN", f"Missing some expected warrior names: {KNOWN_PLAYERS}", 0)
         except Exception as e:

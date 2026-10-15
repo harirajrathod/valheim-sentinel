@@ -3,7 +3,6 @@
 # Scheduled via cron to run daily at 05:30 IST (00:00 UTC)
 
 LOG_FILE="/root/valheim_server/current_run.log"
-TMUX_SESSION="valheim"
 
 # Check if an update is pending or available during daily restart window
 if [ -f "/root/valheim_server/.pending_update" ] || python3 /root/valheim_autopatch.py --check | grep -q "AVAILABLE"; then
