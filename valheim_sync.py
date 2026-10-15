@@ -117,10 +117,11 @@ def run_weekly_sync(dry_run=False):
                 completed_msgs = check_quest_inventory_completion(totals)
                 for cmsg in completed_msgs:
                     print("✓ Quest Auto-Completed by Vault Stockpiles!")
-                    try:
-                        safe_send_whatsapp(cmsg)
-                    except Exception as wa_err:
-                        print(f"Failed to post quest completion to WhatsApp: {wa_err}")
+                    if not dry_run:
+                        try:
+                            safe_send_whatsapp(cmsg)
+                        except Exception as wa_err:
+                            print(f"Failed to post quest completion to WhatsApp: {wa_err}")
             except Exception as q_err:
                 print(f"Quest auto-check error: {q_err}")
         except Exception as e:
