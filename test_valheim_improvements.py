@@ -16,6 +16,7 @@ import sys
 import json
 import tempfile
 import unittest
+from unittest import mock
 import time
 
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -495,9 +496,10 @@ class TestValheimQoL(unittest.TestCase):
         self.assertIn("Silver", frostner_rep)
         self.assertIn("Treasury", frostner_rep)
 
-        # Ready item check
-        shield_rep = vq.get_craft_report("silver shield")
-        self.assertIn("READY TO FORGE!", shield_rep)
+        # Ready item check with hermetic mock
+        with mock.patch("valheim_qol.scan_world_inventory", return_value=({"FineWood": 50, "Silver": 50}, 10)):
+            shield_rep = vq.get_craft_report("silver shield")
+            self.assertIn("READY TO FORGE!", shield_rep)
 
     def test_fleet_report(self):
         import valheim_qol as vq
