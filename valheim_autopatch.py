@@ -48,6 +48,7 @@ from valheim_utils import (
     safe_format_template,
     load_env
 )
+from valheim_constants import PATTERNS
 
 # File Paths
 MANIFEST_PATH    = os.path.join(VALHEIM_DIR, "steamapps/appmanifest_896660.acf")
@@ -395,18 +396,18 @@ def get_active_players() -> Tuple[int, List[str]]:
             lines = f.readlines()
 
         for line in reversed(lines):
-            m_count = re.search(r'now (\d+) player\(s\)', line)
+            m_count = PATTERNS["player_count"].search(line)
             if m_count:
                 count = int(m_count.group(1))
                 break
-            m_conn = re.search(r'Connections (\d+) ZDOS', line)
+            m_conn = PATTERNS["connections"].search(line)
             if m_conn:
                 count = int(m_conn.group(1))
                 break
 
         if count > 0:
             for line in reversed(lines):
-                m_join = re.search(r'Got character ZDOID from ([^:]+) :', line)
+                m_join = PATTERNS["zdo_any"].search(line)
                 if m_join:
                     pname = m_join.group(1).strip()
                     if pname not in recent_names:

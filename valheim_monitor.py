@@ -43,6 +43,8 @@ from valheim_utils import (
     load_env
 )
 
+from valheim_constants import PATTERNS
+
 try:
     from valheim_messages import (
         get_random_join_message,
@@ -211,10 +213,10 @@ def get_active_join_code() -> str:
         with open(LOG_FILE, "r", errors="ignore") as f:
             lines = f.readlines()
         for line in reversed(lines[-200:]):
-            m = re.search(r"registered with join code\s+(\d+)", line)
+            m = PATTERNS["join_code"].search(line)
             if m:
                 return m.group(1)
-            m_alt = re.search(r"join code\s+(\d+)", line)
+            m_alt = PATTERNS["join_code_loose"].search(line)
             if m_alt:
                 return m_alt.group(1)
     except Exception:
@@ -322,7 +324,7 @@ def load_raid_state() -> Optional[Dict[str, Any]]:
 
 
 def record_death(player_name: str, line: str, active_raid: Optional[Dict[str, Any]] = None) -> None:
-    m_ts = re.search(r"^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}):", line)
+    m_ts = PATTERNS["ts_line"].search(line)
     ts = m_ts.group(1) if m_ts else datetime.now(timezone.utc).strftime("%m/%d/%Y %H:%M:%S")
     entry_key = f"{ts}_{player_name}"
     try:
@@ -647,15 +649,15 @@ def monitor() -> None:
                 save_raid_state(False, {"last_raid": last_completed_raid})
                 print(f"Resolved expired active raid on startup: {key} (active cleared)")
 
-    handshake_re    = re.compile(r"Got handshake from client (\S+)")
-    join_re         = re.compile(r"Got character ZDOID from ([^:]+) : (-?\d+):(\d+)")
-    destroy_re      = re.compile(r"Destroying abandoned non persistent zdo \S+ owner (-?\d+)")
-    socket_leave_re = re.compile(r"Closing socket\s+(\S+)")
-    zero_re         = re.compile(r"(?:Connections 0 ZDOS|now 0 player\(s\))")
-    raid_re         = re.compile(r"Random event set:(\w+)")
-    boss_re         = re.compile(r"\b(defeated_\w+)\b", re.IGNORECASE)
-    save_re         = re.compile(r"World save \(\d+/\d+\)")
-    loc_re          = re.compile(r"Placed location (\w+) in zone (-?\d+),(-?\d+)")
+    handshake_re    = PATTERNS["handshake"]           # Got handshake from client <socket>
+    join_re         = PATTERNS["zdo_join"]            # Got character ZDOID from <name> : <zid>:<seq>
+    destroy_re      = PATTERNS["destroy_zdo"]         # Destroying abandoned non persistent zdo ...
+    socket_leave_re = PATTERNS["socket_close"]        # Closing socket <socket>
+    zero_re         = PATTERNS["zero_players"]        # Connections 0 ZDOS | now 0 player(s)
+    raid_re         = PATTERNS["raid_event"]          # Random event set:<name>
+    boss_re         = PATTERNS["boss_defeat_monitor"] # defeated_<something> (any boss key)
+    save_re         = PATTERNS["world_save"]          # World save (N/M)
+    loc_re          = PATTERNS["placed_location"]     # Placed location <loc> in zone x,y
 
     def handle_leave(name: str, reason: str = "", announce: bool = True) -> None:
         if name not in active_names:

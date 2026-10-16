@@ -3,6 +3,7 @@ import sys
 import time
 import re
 import struct
+import mmap
 import difflib
 from itertools import combinations
 
@@ -18,7 +19,10 @@ from valheim_geography import get_traders_status
 from valheim_progression import get_progression_state
 
 
-_INVENTORY_CACHE_FILE = '/root/.cache/valheim_inventory_cache.json'
+_INVENTORY_CACHE_FILE = os.environ.get(
+    "VALHEIM_INVENTORY_CACHE",
+    os.path.join(os.environ.get("VALHEIM_CACHE_DIR", "/root/.cache"), "valheim_inventory_cache.json"),
+)
 _INVENTORY_CACHE_TTL = 15
 
 def scan_world_inventory(force_refresh: bool = False):
@@ -43,9 +47,12 @@ def _scan_world_inventory_uncached():
     container_count = 0
     chunks = get_active_chunk_files()
     for c in chunks:
+        data = None
         try:
             with open(c, 'rb') as f:
-                data = f.read()
+                # Memory-map the chunk instead of reading it whole; find() on
+                # the mmap view is zero-copy and keeps RAM flat on huge worlds.
+                data = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
             idx = 0
             while True:
                 idx = data.find(TARGET_S_ITEMS, idx)
@@ -71,6 +78,9 @@ def _scan_world_inventory_uncached():
                 idx += 4
         except Exception:
             pass
+        finally:
+            if data is not None:
+                data.close()
     return totals, container_count
 
 def get_wealth_report():

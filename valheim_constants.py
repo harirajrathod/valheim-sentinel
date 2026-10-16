@@ -1,7 +1,66 @@
 import struct
 import sys
+import re
 sys.path.insert(0, '/root')
 from valheim_utils import get_stable_hash
+
+# ---------------------------------------------------------------------------
+# Centralized log-pattern registry (single source of truth).
+# All regexes for parsing the Valheim dedicated-server log live here so the
+# suite parses casualty/network events consistently. Consumers import PATTERNS
+# from this module and use the pre-compiled objects instead of recompiling
+# their own literals.
+# ---------------------------------------------------------------------------
+PATTERNS = {
+    # --- ZDO / character lifecycle ---
+    # Full join line: "Got character ZDOID from PlayerName : <zid>:<seq>"
+    "zdo_join":          re.compile(r"Got character ZDOID from ([^:]+) : (-?\d+):(\d+)"),
+    # Owner lookup variant: id component only (used when the seq tail is
+    # followed by other content, e.g. "(... npc)" annotations)
+    "zdo_join_owner":    re.compile(r"Got character ZDOID from ([^:]+) : (-?\d+):"),
+    # Any ZDO line (broad match; used for loose name detection)
+    "zdo_any":           re.compile(r"Got character ZDOID from ([^:]+) :"),
+    # Casualty signal — the ONLY authoritative death marker in the log
+    "zdo_death":         re.compile(r"Got character ZDOID from ([^:]+) : 0:0"),
+    # Timestamped casualty line (used when replaying the full log)
+    "zdo_death_ts":      re.compile(
+        r"^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}): Got character ZDOID from ([^:]+) : 0:0"),
+    # Platform attribution variant: captures a bare name without ":"
+    "zdo_name_only":     re.compile(r"Got character ZDOID from ([^ :]+)"),
+    # Legacy alias kept for safe migrations
+    "zdo_death_legacy":  re.compile(r"Got character ZDOID from ([^:]+) : 0:0"),
+
+    # --- Network / session ---
+    "handshake":          re.compile(r"Got handshake from client (\S+)"),
+    "socket_close":       re.compile(r"Closing socket\s+(\S+)"),
+    "player_count":       re.compile(r"now (\d+) player\(s\)"),
+    "connections":        re.compile(r"Connections (\d+) ZDOS"),
+    "zero_players":       re.compile(r"(?:Connections 0 ZDOS|now 0 player\(s\))"),
+    "join_code":          re.compile(r"registered with join code\s+(\d+)"),
+    "join_code_loose":    re.compile(r"join code\s+(\d+)"),
+    "pre_seeded":         re.compile(r"Pre-seeded active players:\s*(\{[^}]*}|set\(\))"),
+    "platform_id":        re.compile(r"Platform ID ((?:Steam|PlayStation|Xbox)_[a-zA-Z0-9_-]+)"),
+
+    # --- Hostile / world events ---
+    "raid_event":         re.compile(r"Random event set:(\w+)"),
+    "world_save":         re.compile(r"World save \((\d+)/(\d+)\)"),
+    "placed_location":    re.compile(r"Placed location (\w+) in zone (-?\d+),(-?\d+)"),
+    "join_cli":           re.compile(r"Join:\s+([^\s\(]+)"),
+    "leave_cli":          re.compile(r"Leave(?:\s+\([^\)]+\))?:\s+([^\s]+)"),
+    "boss_defeat_monitor": re.compile(r"\b(defeated_\w+)\b", re.IGNORECASE),
+    "boss_defeat_chronicle": re.compile(
+        r"\b(defeated_(?:eikthyr|gdking|bonemass|dragon|writhan|goblinking|queen|fader|fimbulbringer))\b",
+        re.IGNORECASE),
+
+    # --- Npc despawn / world save markers ---
+    "destroy_zdo":        re.compile(r"Destroying abandoned non persistent zdo \S+ owner (-?\d+)"),
+    "portal_connect":     re.compile(
+        r"^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}): Connected portals (-?\d+):(\d+) <-> (-?\d+):(\d+)"),
+
+    # --- Log line timestamp variants ---
+    "ts_line":            re.compile(r"^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}):"),
+    "ts_plain":           re.compile(r"^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2})"),
+}
 
 # Boss chain in order. 'aliases' covers alternate keys the game may record.
 BOSS_CHAIN = [

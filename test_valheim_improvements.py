@@ -89,6 +89,12 @@ class TestValheimUtils(unittest.TestCase):
         res = vu.is_valheim_running()
         self.assertIsInstance(res, bool)
 
+    def test_worlds_dir_and_world_dir_contract(self):
+        """Ensure WORLDS_DIR is the parent worlds_local dir and WORLD_DIR is the active world."""
+        self.assertTrue(vu.WORLDS_DIR.endswith("worlds_local"))
+        self.assertEqual(vu.WORLD_NAME, "Valheim10")
+        self.assertEqual(vu.WORLD_DIR, os.path.join(vu.WORLDS_DIR, vu.WORLD_NAME))
+
     def test_get_valheim_player_count_parsing(self):
         # Non-existent file
         self.assertEqual(vu.get_valheim_player_count("/tmp/non_existent_valheim.log"), 0)

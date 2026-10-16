@@ -16,6 +16,8 @@ from itertools import combinations
 sys.path.insert(0, '/root')
 from valheim_utils import (
     LOG_FILE,
+    WORLDS_DIR,
+    WORLD_DIR,
     IST,
     format_player_name,
     safe_load_json,
@@ -23,6 +25,7 @@ from valheim_utils import (
     get_stable_hash,
     get_active_chunk_files,
 )
+from valheim_constants import PATTERNS
 
 
 def find_next_zdo_boundary(data, start_idx, max_search=250):
@@ -91,7 +94,7 @@ def get_traders_status():
     # Check Hildir quest completion from db2
     hildir_quests = []
     try:
-        db_files = sorted(glob.glob('/root/.config/unity3d/IronGate/Valheim/worlds_local/Valheim10/_main.*.db2'))
+        db_files = sorted(glob.glob(os.path.join(WORLD_DIR, "_main.*.db2")))
         if db_files:
             with open(db_files[-1], 'rb') as f:
                 db_data = f.read()
@@ -211,7 +214,7 @@ def get_portal_report():
         'PlayStation_6663223001167151777': 'Rukia',
     }
     owner_map = {}
-    ok_files = glob.glob('/root/.config/unity3d/IronGate/Valheim/worlds_local/Valheim10/_main.*.ok')
+    ok_files = glob.glob(os.path.join(WORLD_DIR, "_main.*.ok"))
     if ok_files:
         last_save_mtime = max((os.path.getmtime(f) for f in ok_files), default=0)
     elif chunks:
@@ -227,21 +230,21 @@ def get_portal_report():
                 log_lines = f.readlines()
             last_platform = None
             for l in log_lines[-10000:]:
-                m_plat = re.search(r'Platform ID ((?:Steam|PlayStation|Xbox)_[a-zA-Z0-9_-]+)', l)
+                m_plat = PATTERNS["platform_id"].search(l)
                 if m_plat:
                     last_platform = m_plat.group(1)
-                m_name = re.search(r'Got character ZDOID from ([^ :]+)', l)
+                m_name = PATTERNS["zdo_name_only"].search(l)
                 if m_name and last_platform:
                     platform_map[last_platform] = m_name.group(1)
                     last_platform = None
-                m_owner = re.search(r'Got character ZDOID from ([^:]+) : (-?\d+):', l)
+                m_owner = PATTERNS["zdo_join_owner"].search(l)
                 if m_owner:
                     owner_map[m_owner.group(2).strip()] = m_owner.group(1).strip()
 
             # Check for live portal connections in memory newer than last disk save
             seen_portal_pairs = set()
             for l in reversed(log_lines[-200:]):
-                m_conn = re.search(r'^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}): Connected portals (-?\d+):(\d+) <-> (-?\d+):(\d+)', l)
+                m_conn = PATTERNS["portal_connect"].search(l)
                 if m_conn:
                     ts_str, u1, id1, u2, id2 = m_conn.group(1), m_conn.group(2), m_conn.group(3), m_conn.group(4), m_conn.group(5)
                     pair_key = tuple(sorted([(u1, id1), (u2, id2)]))

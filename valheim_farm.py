@@ -19,6 +19,7 @@ import glob
 import re
 import math
 import struct
+import mmap
 import argparse
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Tuple, List, Optional
@@ -89,37 +90,42 @@ def scan_farm_world() -> Dict[str, Any]:
     for c in chunks:
         try:
             with open(c, 'rb') as f:
-                data = f.read()
+                # Memory-map the binary chunk instead of reading it whole —
+                # keeps RAM flat even on huge worlds and zero-copy for find().
+                data = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         except Exception:
             continue
 
-        # Extract registered portals to identify remote farming outposts
-        for ph in PORTAL_HASHES:
-            idx = 0
-            while True:
-                idx = data.find(ph, idx)
-                if idx == -1:
-                    break
-                if idx >= 12:
-                    x, y, z = struct.unpack('<fff', data[idx-12:idx])
-                    if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
-                        and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
-                        portals.append((x, z))
-                idx += 4
+        try:
+            # Extract registered portals to identify remote farming outposts
+            for ph in PORTAL_HASHES:
+                idx = 0
+                while True:
+                    idx = data.find(ph, idx)
+                    if idx == -1:
+                        break
+                    if idx >= 12:
+                        x, y, z = struct.unpack('<fff', data[idx-12:idx])
+                        if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
+                            and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
+                            portals.append((x, z))
+                    idx += 4
 
-        # Extract potential agricultural prefabs
-        for p_bytes, prefab_name in HASH_TO_PREFAB.items():
-            idx = 0
-            while True:
-                idx = data.find(p_bytes, idx)
-                if idx == -1:
-                    break
-                if idx >= 12:
-                    x, y, z = struct.unpack('<fff', data[idx-12:idx])
-                    if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
-                        and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
-                        raw_farm_items.append((x, y, z, prefab_name))
-                idx += 4
+            # Extract potential agricultural prefabs
+            for p_bytes, prefab_name in HASH_TO_PREFAB.items():
+                idx = 0
+                while True:
+                    idx = data.find(p_bytes, idx)
+                    if idx == -1:
+                        break
+                    if idx >= 12:
+                        x, y, z = struct.unpack('<fff', data[idx-12:idx])
+                        if (-10500 <= x <= 10500 and -500 <= y <= 1000 and -10500 <= z <= 10500
+                            and not (abs(x) < 0.1 and abs(y) < 0.1 and abs(z) < 0.1)):
+                            raw_farm_items.append((x, y, z, prefab_name))
+                    idx += 4
+        finally:
+            data.close()
 
     raw_counts = {k: 0 for k in FARM_PREFABS}
 

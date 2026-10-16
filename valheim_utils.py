@@ -24,11 +24,21 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional, Tuple
 
 # --- Central Paths & Configuration ---
-VALHEIM_DIR = "/root/valheim_server"
-WORLDS_DIR = "/root/.config/unity3d/IronGate/Valheim/worlds_local"
-BACKUP_BASE = "/root/valheim_server_backups"
-LOG_FILE = os.path.join(VALHEIM_DIR, "current_run.log")
-ENV_FILE = "/root/.env"
+# Every path below honors an explicit environment override first so the suite
+# can be relocated off /root without code edits (e.g., VALHEIM_DIR=/srv/valheim).
+VALHEIM_ROOT = os.environ.get("VALHEIM_ROOT", "/root")
+VALHEIM_DIR  = os.environ.get("VALHEIM_DIR", os.path.join(VALHEIM_ROOT, "valheim_server"))
+WORLDS_DIR   = os.environ.get(
+    "VALHEIM_WORLDS_DIR",
+    os.path.join(VALHEIM_ROOT, ".config/unity3d/IronGate/Valheim/worlds_local"),
+)
+WORLD_NAME   = os.environ.get("VALHEIM_WORLD_NAME", "Valheim10")
+WORLD_DIR    = os.environ.get("VALHEIM_WORLD_DIR", os.path.join(WORLDS_DIR, WORLD_NAME))
+BACKUP_BASE  = os.environ.get("VALHEIM_BACKUP_BASE", os.path.join(VALHEIM_ROOT, "valheim_server_backups"))
+LOG_FILE     = os.path.join(VALHEIM_DIR, "current_run.log")
+ENV_FILE     = os.environ.get("VALHEIM_ENV_FILE", os.path.join(VALHEIM_ROOT, ".env"))
+# Directory holding the suite's state JSON files (boss kills, deaths, etc.).
+STATE_BASE   = os.environ.get("VALHEIM_STATE_BASE", VALHEIM_ROOT)
 TMUX_SESSION = "valheim"
 APP_ID = "896660"            # Dedicated Server AppID
 CLIENT_APP_ID = "892970"     # Valheim Game Client AppID
@@ -37,6 +47,16 @@ CLIENT_APP_ID = "892970"     # Valheim Game Client AppID
 VALHEIM_WHATSAPP_GROUP = "120363426206773037@g.us"
 WHATSAPP_BRIDGE_URL = "http://127.0.0.1:3000/send"
 IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def state_path(name: str) -> str:
+    """Returns the absolute path for a suite state file under STATE_BASE.
+
+    Honoring env overrides: any file here can also be redirected individually
+    via VALHEIM_STATE_<NAME> if a relocation needs per-file placement.
+    """
+    env = os.environ.get("VALHEIM_STATE_" + name.replace(".json", "").replace(".", "_").upper())
+    return env if env else os.path.join(STATE_BASE, name)
 
 # Known Player Name Normalization
 KNOWN_PLAYERS = {
@@ -277,7 +297,7 @@ def get_active_chunk_files():
     Matches r'^(.*__\d+)_(\d+)\.chunk$' to select the highest version
     for each chunk prefix during live save transitions.
     """
-    raw_chunks = glob.glob('/root/.config/unity3d/IronGate/Valheim/worlds_local/Valheim10/*.chunk')
+    raw_chunks = glob.glob(os.path.join(WORLD_DIR, "*.chunk"))
     chunks_by_prefix = {}
     for c in raw_chunks:
         m = re.match(r'^(.*__\d+)_(\d+)\.chunk$', c)

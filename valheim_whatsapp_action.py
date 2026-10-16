@@ -21,7 +21,11 @@ import argparse
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 
-sys.path.insert(0, "/root")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+if "/root" not in sys.path:
+    sys.path.append("/root")
 from valheim_utils import (
     VALHEIM_DIR,
     LOG_FILE,
@@ -30,6 +34,7 @@ from valheim_utils import (
     format_player_name,
     sanitize_network_copy
 )
+from valheim_constants import PATTERNS
 
 
 def log_debug(msg: str) -> None:
@@ -140,7 +145,7 @@ def get_server_info() -> Dict[str, Any]:
                                         relay_region = "West Europe (PlayFab Azure)"
                             except Exception:
                                 pass
-                    m_hs = re.search(r'Got handshake from client (\S+)', line)
+                    m_hs = PATTERNS["handshake"].search(line)
                     if m_hs:
                         last_sid = m_hs.group(1).rstrip(",")
                     if "Connections 0 ZDOS" in line or "now 0 player(s)" in line:
@@ -148,7 +153,7 @@ def get_server_info() -> Dict[str, Any]:
                         sid_to_name.clear()
                         player_load_times.clear()
                         continue
-                    m_join = re.search(r'Got character ZDOID from ([^:]+) : (-?\d+):(\d+)', line)
+                    m_join = PATTERNS["zdo_join"].search(line)
                     if m_join:
                         raw_name = m_join.group(1).strip()
                         name = format_player_name(raw_name)
@@ -158,7 +163,7 @@ def get_server_info() -> Dict[str, Any]:
                             if last_sid:
                                 sid_to_name[last_sid] = name
                             if name not in player_load_times:
-                                m_ts = re.search(r'^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2})', line)
+                                m_ts = PATTERNS["ts_plain"].search(line)
                                 if m_ts:
                                     try:
                                         dt_utc = datetime.strptime(m_ts.group(1), '%m/%d/%Y %H:%M:%S').replace(tzinfo=timezone.utc)
@@ -167,13 +172,13 @@ def get_server_info() -> Dict[str, Any]:
                                         pass
                         last_sid = None
                         continue
-                    m_dest = re.search(r'Destroying abandoned non persistent zdo \S+ owner (-?\d+)', line)
+                    m_dest = PATTERNS["destroy_zdo"].search(line)
                     if m_dest:
                         owner = m_dest.group(1).strip()
                         pname = active_players.pop(owner, None)
                         if pname and pname not in active_players.values():
                             player_load_times.pop(pname, None)
-                    m_sock = re.search(r'Closing socket\s+(\S+)', line)
+                    m_sock = PATTERNS["socket_close"].search(line)
                     if m_sock:
                         sid = m_sock.group(1).rstrip(",")
                         pname = sid_to_name.pop(sid, None)
