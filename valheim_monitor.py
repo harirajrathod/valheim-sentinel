@@ -18,10 +18,7 @@ import os
 import sys
 import time
 import re
-import json
-import urllib.request
-import urllib.parse
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from collections import Counter
 import glob
 import zlib
@@ -30,11 +27,7 @@ from typing import Dict, Any, Set, List, Optional, Tuple
 
 sys.path.insert(0, "/root")
 from valheim_utils import (
-    VALHEIM_DIR,
     LOG_FILE,
-    ENV_FILE,
-    IST,
-    VALHEIM_WHATSAPP_GROUP,
     format_player_name,
     safe_load_json,
     atomic_save_json,
@@ -72,6 +65,7 @@ RAID_LORE = {
     "army_eikthyr": ("Eikthyr rallies the creatures of the forest! ⚡", "Boars & Necks"),
     "army_theelder": ("The forest is moving... 🌲", "Greydwarf Horde & Brutes"),
     "army_bonemass": ("A foul smell from the swamp... ☣️", "Skeletons & Blobs"),
+    "blobs": ("A foul smell from the swamp... ☣️", "Blobs & Oozers"),
     "army_moder": ("A cold wind blows from the mountain... ❄️", "Drakes"),
     "army_goblin": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
     "army_yagluth": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
@@ -89,6 +83,7 @@ RAID_SPAWN_DURATIONS = {
     "army_eikthyr": 90,
     "army_theelder": 120,
     "army_bonemass": 120,
+    "blobs": 120,
     "army_moder": 120,
     "army_goblin": 120,
     "army_yagluth": 120,

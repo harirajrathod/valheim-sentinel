@@ -18,8 +18,8 @@ import json
 import base64
 import subprocess
 import argparse
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Dict, Any, List
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
@@ -31,8 +31,7 @@ from valheim_utils import (
     LOG_FILE,
     TMUX_SESSION,
     IST,
-    format_player_name,
-    sanitize_network_copy
+    format_player_name
 )
 from valheim_constants import PATTERNS
 
@@ -121,12 +120,11 @@ def get_server_info() -> Dict[str, Any]:
             with open(LOG_FILE, "r", errors="ignore") as f:
                 last_sid = None
                 for line in f:
-                    if "registered with join code" in line or "join code " in line:
-                        m_code = re.search(r'join code\s+(\d+)', line)
-                        if m_code:
-                            join_code = m_code.group(1)
-                    if "Valheim " in line and "network version" in line:
-                        m_ver = re.search(r'Valheim\s+(l-[\d\.]+.*?\(network version \d+\))', line)
+                    m_code = PATTERNS["join_code"].search(line) or PATTERNS["join_code_loose"].search(line)
+                    if m_code:
+                        join_code = m_code.group(1)
+                    if "Valheim" in line and "network version" in line:
+                        m_ver = PATTERNS["version"].search(line)
                         if m_ver:
                             version = m_ver.group(1)
                     if "Lobby " in line and "and network " in line:

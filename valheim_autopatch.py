@@ -35,18 +35,14 @@ from valheim_utils import (
     WORLDS_DIR,
     BACKUP_BASE,
     LOG_FILE,
-    ENV_FILE,
     TMUX_SESSION,
     APP_ID,
     CLIENT_APP_ID,
-    VALHEIM_WHATSAPP_GROUP,
     atomic_save_json,
     safe_load_json,
     safe_send_whatsapp,
     safe_send_telegram,
     safe_urlopen,
-    safe_format_template,
-    load_env
 )
 from valheim_constants import PATTERNS
 

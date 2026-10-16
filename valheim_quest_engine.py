@@ -485,7 +485,7 @@ def call_gemini_intent(message_text, sender_name="Hilda"):
                     parsed = json.loads(text)
                     if isinstance(parsed, dict):
                         return parsed
-            except Exception as e:
+            except Exception:
                 time.sleep(1)
     return None
 

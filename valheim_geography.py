@@ -4,24 +4,16 @@ import time
 import math
 import re
 import glob
-import json
 import zlib
 import struct
-import ctypes
-import argparse
-import subprocess
-from datetime import datetime, timedelta, timezone
-from itertools import combinations
+from datetime import datetime, timezone
 
 sys.path.insert(0, '/root')
 from valheim_utils import (
     LOG_FILE,
-    WORLDS_DIR,
     WORLD_DIR,
     IST,
     format_player_name,
-    safe_load_json,
-    atomic_save_json,
     get_stable_hash,
     get_active_chunk_files,
 )

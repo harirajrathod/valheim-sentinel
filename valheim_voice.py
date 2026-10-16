@@ -18,10 +18,7 @@ import re
 import time
 import tempfile
 import asyncio
-import json
-import urllib.request
-import urllib.parse
-from typing import Dict, Any, List, Optional, Union
+from typing import List, Optional
 
 sys.path.insert(0, "/root")
 from valheim_utils import (
@@ -30,8 +27,6 @@ from valheim_utils import (
     format_player_name,
     safe_load_json,
     atomic_save_json,
-    safe_urlopen,
-    IST
 )
 
 VOICE_CACHE_DIR = "/root/.cache/valheim_voice"

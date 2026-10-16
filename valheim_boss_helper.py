@@ -13,7 +13,6 @@ import sys
 import re
 import json
 from datetime import datetime, timezone, timedelta
-from collections import Counter
 
 sys.path.insert(0, "/root")
 from valheim_utils import (

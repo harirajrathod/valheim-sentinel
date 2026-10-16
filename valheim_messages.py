@@ -193,6 +193,16 @@ MACRO_ROASTS = {
             "☣️ [Valheim] *{name}* is back! Scrubbed the swamp mud off and ready to crack some Draugr skulls."
         ]
     },
+    "RAID_CASUALTY_blobs": {
+        "leave": [
+            "🧪 [Valheim] *{name}* took a face full of toxic green blob ooze and logged off coughing.",
+            "☣️ [Valheim] *{name}* disconnected. Poison ticked for 100 damage while frantically searching for mead."
+        ],
+        "resume": [
+            "🧪 [Valheim] *{name}* chugged poison resistance mead IRL and logged back in to pop those blobs!",
+            "☣️ [Valheim] *{name}* returned with a blunt iron mace to smash some toxic swamp slime!"
+        ]
+    },
     "RAID_CASUALTY_army_eikthyr": {
         "leave": [
             "🐗 [Valheim] *{name}* disconnected. Eikthyr rallied the forest boars and *{name}* got gored into next week.",

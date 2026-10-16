@@ -19,28 +19,25 @@ import re
 import json
 import argparse
 import subprocess
-import urllib.request
-import urllib.parse
 import glob
 import struct
-import ctypes
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, "/root")
 from valheim_utils import (
     LOG_FILE,
-    VALHEIM_WHATSAPP_GROUP,
-    WHATSAPP_BRIDGE_URL,
     IST,
     format_player_name,
     safe_send_whatsapp,
     get_stable_hash,
 )
+from valheim_constants import PATTERNS
 
 RAID_LORE = {
     "army_eikthyr": ("Eikthyr rallies the creatures of the forest! ⚡", "Boars & Necks"),
     "army_theelder": ("The forest is moving... 🌲", "Greydwarf Horde & Brutes"),
     "army_bonemass": ("A foul smell from the swamp... ☣️", "Skeletons & Blobs"),
+    "blobs": ("A foul smell from the swamp... ☣️", "Blobs & Oozers"),
     "army_moder": ("A cold wind blows from the mountain... ❄️", "Drakes"),
     "army_goblin": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
     "army_yagluth": ("The horde is attacking! ⚔️", "Fuling Goblin Army"),
@@ -283,12 +280,12 @@ def parse_server_events(cutoff_utc):
     locations = []
     boss_defeats = []
     
-    boss_re = re.compile(r"\b(defeated_(?:eikthyr|gdking|bonemass|dragon|writhan|goblinking|queen|fader|fimbulbringer))\b", re.IGNORECASE)
+    boss_re = PATTERNS["boss_defeat_chronicle"]
 
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r", errors="ignore") as f:
             for line in f:
-                m_ts = re.match(r"^(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}):", line)
+                m_ts = PATTERNS["ts_line"].match(line)
                 if not m_ts:
                     continue
                 ts_str = m_ts.group(1)
@@ -301,19 +298,19 @@ def parse_server_events(cutoff_utc):
                     continue
                     
                 if "Random event set:" in line:
-                    m_raid = re.search(r"Random event set:(\w+)", line)
+                    m_raid = PATTERNS["raid_event"].search(line)
                     if m_raid:
                         raids.append((dt, m_raid.group(1)))
                         
                 if ": 0:0" in line:
-                    m_death = re.search(r"Got character ZDOID from ([^:]+) : 0:0", line)
+                    m_death = PATTERNS["zdo_death"].search(line)
                     if m_death:
                         pname = m_death.group(1).strip()
                         if pname and pname != "0":
                             deaths.append((dt, format_player_name(pname)))
                             
                 if "Placed location" in line:
-                    m_loc = re.search(r"Placed location (\w+) in zone (-?\d+),(-?\d+)", line)
+                    m_loc = PATTERNS["placed_location"].search(line)
                     if m_loc:
                         locations.append((dt, m_loc.group(1), m_loc.group(2), m_loc.group(3)))
 

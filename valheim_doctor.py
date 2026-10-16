@@ -24,7 +24,7 @@ import time
 import py_compile
 import subprocess
 import argparse
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 # ANSI Color Codes
 GREEN = "\033[92m"
@@ -53,10 +53,15 @@ class ValheimDoctor:
             "elapsed_ms": round(elapsed_ms, 1)
         })
 
-    def run_cmd(self, cmd: List[str], timeout: int = 15) -> Tuple[int, str, str, float]:
+    def run_cmd(self, cmd: List[str], timeout: int = 15, env: Optional[Dict[str, str]] = None) -> Tuple[int, str, str, float]:
         t0 = time.time()
+        run_env = os.environ.copy()
+        if "XDG_RUNTIME_DIR" not in run_env:
+            run_env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
+        if env:
+            run_env.update(env)
         try:
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout, env=run_env)
             elapsed = (time.time() - t0) * 1000.0
             return res.returncode, res.stdout.strip(), res.stderr.strip(), elapsed
         except subprocess.TimeoutExpired:

@@ -14,7 +14,6 @@ Features:
 - Comprehensive --dry-run preview mode
 """
 
-import os
 import sys
 import json
 import time

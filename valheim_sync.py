@@ -26,7 +26,7 @@ import argparse
 import subprocess
 from datetime import datetime, timezone, timedelta
 
-from valheim_utils import safe_send_whatsapp
+from valheim_utils import safe_send_whatsapp, atomic_save_json
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -156,56 +156,46 @@ def run_weekly_sync(dry_run=False):
     # 3. Synchronize state files if not dry-run
     if not dry_run:
         # Sync traders state
-        try:
-            with open(TRADER_STATE_FILE, "w") as f:
-                json.dump(audit["traders"], f, indent=2)
+        if atomic_save_json(TRADER_STATE_FILE, audit["traders"]):
             print(f"✓ Saved updated trader state to {TRADER_STATE_FILE}")
-        except Exception as e:
-            print(f"✗ Failed saving {TRADER_STATE_FILE}: {e}")
+        else:
+            print(f"✗ Failed saving {TRADER_STATE_FILE}")
 
         # Sync known traders list for monitor
-        try:
-            known_camps = set()
-            if os.path.exists(KNOWN_TRADERS_FILE):
-                try:
-                    with open(KNOWN_TRADERS_FILE, "r") as f:
-                        known_camps = set(json.load(f))
-                except Exception:
-                    pass
-            for t_key, t_data in audit["traders"].items():
-                if t_data.get("discovered"):
-                    if t_key == "Haldor": known_camps.add("Vendor_BlackForest")
-                    elif t_key == "Hildir": known_camps.add("Hildir_camp")
-                    elif t_key == "BogWitch": known_camps.add("BogWitch_Camp")
-            with open(KNOWN_TRADERS_FILE, "w") as f:
-                json.dump(sorted(list(known_camps)), f, indent=2)
+        known_camps = set()
+        if os.path.exists(KNOWN_TRADERS_FILE):
+            try:
+                with open(KNOWN_TRADERS_FILE, "r") as f:
+                    known_camps = set(json.load(f))
+            except Exception:
+                pass
+        for t_key, t_data in audit["traders"].items():
+            if t_data.get("discovered"):
+                if t_key == "Haldor": known_camps.add("Vendor_BlackForest")
+                elif t_key == "Hildir": known_camps.add("Hildir_camp")
+                elif t_key == "BogWitch": known_camps.add("BogWitch_Camp")
+        if atomic_save_json(KNOWN_TRADERS_FILE, sorted(list(known_camps))):
             print(f"✓ Synchronized {KNOWN_TRADERS_FILE}")
-        except Exception as e:
-            print(f"✗ Failed saving {KNOWN_TRADERS_FILE}: {e}")
+        else:
+            print(f"✗ Failed saving {KNOWN_TRADERS_FILE}")
 
         # Sync boss state
-        try:
-            with open(BOSS_STATE_FILE, "w") as f:
-                json.dump(audit["bosses"], f, indent=2)
+        if atomic_save_json(BOSS_STATE_FILE, audit["bosses"]):
             print(f"✓ Synchronized {BOSS_STATE_FILE}")
-        except Exception as e:
-            print(f"✗ Failed saving {BOSS_STATE_FILE}: {e}")
+        else:
+            print(f"✗ Failed saving {BOSS_STATE_FILE}")
 
         # Sync Hildir quests state
-        try:
-            with open(HILDIR_STATE_FILE, "w") as f:
-                json.dump(audit["hildir_quests"], f, indent=2)
+        if atomic_save_json(HILDIR_STATE_FILE, audit["hildir_quests"]):
             print(f"✓ Synchronized {HILDIR_STATE_FILE}")
-        except Exception as e:
-            print(f"✗ Failed saving {HILDIR_STATE_FILE}: {e}")
+        else:
+            print(f"✗ Failed saving {HILDIR_STATE_FILE}")
 
         # Save audit snapshot
-        try:
-            with open(WEEKLY_AUDIT_FILE, "w") as f:
-                json.dump(audit, f, indent=2)
+        if atomic_save_json(WEEKLY_AUDIT_FILE, audit):
             print(f"✓ Saved audit snapshot to {WEEKLY_AUDIT_FILE}")
-        except Exception as e:
-            print(f"✗ Failed saving {WEEKLY_AUDIT_FILE}: {e}")
+        else:
+            print(f"✗ Failed saving {WEEKLY_AUDIT_FILE}")
 
     print("=== SYNCHRONIZATION COMPLETE ===")
     return audit

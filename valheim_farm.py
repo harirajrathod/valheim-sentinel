@@ -12,23 +12,16 @@ Features:
 - Atomic persistence with /root/valheim_farm_state.json and cooldown guards
 """
 
-import os
 import sys
 import time
-import glob
-import re
 import math
 import struct
 import mmap
 import argparse
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any
 
 sys.path.insert(0, "/root")
 from valheim_utils import (
-    LOG_FILE,
-    VALHEIM_WHATSAPP_GROUP,
-    IST,
     safe_load_json,
     atomic_save_json,
     safe_send_whatsapp,

@@ -1,27 +1,19 @@
 import os
 import sys
 import time
-import math
 import re
 import glob
 import json
 import zlib
-import struct
-import ctypes
-import argparse
 import subprocess
 from datetime import datetime, timedelta, timezone
-from itertools import combinations
 
 sys.path.insert(0, '/root')
 from valheim_utils import (
     LOG_FILE,
-    IST,
     format_player_name,
     safe_load_json,
     atomic_save_json,
-    get_stable_hash,
-    get_active_chunk_files,
 )
 
 from valheim_constants import BOSS_CHAIN
@@ -157,7 +149,6 @@ def get_active_boss_and_era():
     """
     prog = get_progression_state()
     next_boss_data = prog['next_boss']
-    defeated_keys = prog['defeated_keys']
 
     BOSS_LORE = {
         'defeated_eikthyr': 'Boar, Deer, Wood, Stone, Leather',

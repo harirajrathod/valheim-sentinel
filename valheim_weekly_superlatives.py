@@ -24,18 +24,14 @@ import re
 import json
 import glob
 import struct
-import ctypes
 import argparse
 import subprocess
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 
 sys.path.insert(0, "/root")
 from valheim_utils import (
     LOG_FILE,
-    VALHEIM_WHATSAPP_GROUP,
-    WHATSAPP_BRIDGE_URL,
     IST,
     format_player_name,
     safe_send_whatsapp,

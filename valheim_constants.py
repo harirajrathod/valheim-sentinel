@@ -38,6 +38,7 @@ PATTERNS = {
     "zero_players":       re.compile(r"(?:Connections 0 ZDOS|now 0 player\(s\))"),
     "join_code":          re.compile(r"registered with join code\s+(\d+)"),
     "join_code_loose":    re.compile(r"join code\s+(\d+)"),
+    "version":            re.compile(r"Valheim\s+(?:version:\s*)?(l-[\d\.]+.*?\(network version \d+\))"),
     "pre_seeded":         re.compile(r"Pre-seeded active players:\s*(\{[^}]*}|set\(\))"),
     "platform_id":        re.compile(r"Platform ID ((?:Steam|PlayStation|Xbox)_[a-zA-Z0-9_-]+)"),
 

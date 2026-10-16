@@ -28,7 +28,7 @@ import argparse
 from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, "/root")
-from valheim_farm import get_stable_hash, get_active_chunk_files
+from valheim_utils import get_stable_hash, get_active_chunk_files
 from valheim_info import (
     find_next_zdo_boundary,
     scan_world_inventory,

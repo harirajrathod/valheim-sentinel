@@ -12,7 +12,6 @@ import os
 import re
 import json
 import random
-import time
 import urllib.request
 
 sys.path.insert(0, "/root")
