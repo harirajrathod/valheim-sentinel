@@ -511,6 +511,7 @@ def get_mead_report() -> str:
     raspberries = totals.get("Raspberry", 0)
     blueberries = totals.get("Blueberries", 0)
     cloudberries = totals.get("Cloudberry", 0)
+    barley = totals.get("Barley", 0)
 
     lines = [
         "🍺 *VALHEIM MEAD CELLAR & BREWERY* 🍯",
@@ -548,21 +549,27 @@ def get_mead_report() -> str:
 
     lines.append("")
     lines.append("🍲 *Brewing Pantry Potential:*")
-    lines.append(f"• 🍯 *Honey:* {honey} | 🌿 *Thistle:* {thistle} | 🫐 *Berries:* {raspberries + blueberries + cloudberries}")
+    pantry_str = f"• 🍯 *Honey:* {honey} | 🌿 *Thistle:* {thistle} | 🫐 *Berries:* {raspberries + blueberries}"
+    if barley > 0 or cloudberries > 0:
+        pantry_str += f" | 🌾 *Plains:* {barley} Barley, {cloudberries} Cloudberries"
+    lines.append(pantry_str)
 
     # Calculate potential brews
     poison_batches = min(honey // 10, thistle // 5) if honey >= 10 and thistle >= 5 else 0
     frost_batches = min(honey // 10, thistle // 5) if honey >= 10 and thistle >= 5 else 0
+    fire_wine_batches = min(barley // 10, cloudberries // 10) if barley >= 10 and cloudberries >= 10 else 0
     craft_tips = []
     if frost_batches > 0:
         craft_tips.append(f"{min(frost_batches, 10)}x Frost Resist")
     if poison_batches > 0:
         craft_tips.append(f"{min(poison_batches, 10)}x Poison Resist")
+    if fire_wine_batches > 0:
+        craft_tips.append(f"{min(fire_wine_batches, 10)}x Fire Resist Wine")
 
     if craft_tips:
         lines.append(f"• 💡 *Ready to brew:* Can craft {', '.join(craft_tips)} at the Cauldron!")
     else:
-        lines.append("• 💡 *Tip:* Gather more Honey & Thistle to brew protective mead bases!")
+        lines.append("• 💡 *Tip:* Gather more Honey, Thistle or Barley & Cloudberries to brew protective mead bases!")
 
     return "\n".join(lines)
 
@@ -683,6 +690,82 @@ def get_rescue_report(player_query: Optional[str] = None) -> str:
 # ==============================================================================
 
 RECIPE_CATALOG = {
+    # Plains Gear (Active Era)
+    "padded armor chest": {
+        "name": "Padded Cuirass (Chest) 🌾",
+        "station": "Forge Lv. 2",
+        "mats": {"Iron": (10, "Iron"), "LinenThread": (20, "Linen Thread (Spin Flax)")},
+    },
+    "padded cuirass": {
+        "name": "Padded Cuirass (Chest) 🌾",
+        "station": "Forge Lv. 2",
+        "mats": {"Iron": (10, "Iron"), "LinenThread": (20, "Linen Thread (Spin Flax)")},
+    },
+    "padded armor legs": {
+        "name": "Padded Greaves (Legs) 🌾",
+        "station": "Forge Lv. 2",
+        "mats": {"Iron": (10, "Iron"), "LinenThread": (20, "Linen Thread (Spin Flax)")},
+    },
+    "padded greaves": {
+        "name": "Padded Greaves (Legs) 🌾",
+        "station": "Forge Lv. 2",
+        "mats": {"Iron": (10, "Iron"), "LinenThread": (20, "Linen Thread (Spin Flax)")},
+    },
+    "padded helmet": {
+        "name": "Padded Helmet 🌾",
+        "station": "Forge Lv. 1",
+        "mats": {"Iron": (10, "Iron"), "LinenThread": (15, "Linen Thread (Spin Flax)")},
+    },
+    "black metal shield": {
+        "name": "Black Metal Shield 🛡️",
+        "station": "Forge Lv. 3",
+        "mats": {"FineWood": (10, "Fine Wood"), "BlackMetal": (8, "Black Metal"), "Chain": (5, "Chain")},
+    },
+    "black metal tower shield": {
+        "name": "Black Metal Tower Shield 🛡️",
+        "station": "Forge Lv. 3",
+        "mats": {"FineWood": (15, "Fine Wood"), "BlackMetal": (10, "Black Metal"), "Chain": (7, "Chain")},
+    },
+    "black metal atgeir": {
+        "name": "Black Metal Atgeir 🔱",
+        "station": "Forge Lv. 4",
+        "mats": {"FineWood": (10, "Fine Wood"), "BlackMetal": (30, "Black Metal"), "LinenThread": (5, "Linen Thread")},
+    },
+    "black metal sword": {
+        "name": "Black Metal Sword ⚔️",
+        "station": "Forge Lv. 4",
+        "mats": {"FineWood": (2, "Fine Wood"), "BlackMetal": (20, "Black Metal"), "LinenThread": (5, "Linen Thread")},
+    },
+    "black metal axe": {
+        "name": "Black Metal Axe 🪓",
+        "station": "Forge Lv. 4",
+        "mats": {"FineWood": (6, "Fine Wood"), "BlackMetal": (20, "Black Metal"), "LinenThread": (5, "Linen Thread")},
+    },
+    "black metal knife": {
+        "name": "Black Metal Knife 🗡️",
+        "station": "Forge Lv. 4",
+        "mats": {"FineWood": (4, "Fine Wood"), "BlackMetal": (10, "Black Metal"), "LinenThread": (5, "Linen Thread")},
+    },
+    "porcupine": {
+        "name": "Porcupine (Mace) 🦔",
+        "station": "Forge Lv. 4",
+        "mats": {"FineWood": (5, "Fine Wood"), "Iron": (20, "Iron"), "Needle": (5, "Needles (Deathsquitos)"), "LinenThread": (10, "Linen Thread")},
+    },
+    "lox cape": {
+        "name": "Lox Cape 🦙",
+        "station": "Workbench Lv. 2",
+        "mats": {"LoxPelt": (6, "Lox Pelt"), "Silver": (2, "Silver")},
+    },
+    "needle arrows": {
+        "name": "Needle Arrows (x20) 🏹",
+        "station": "Workbench Lv. 4",
+        "mats": {"Needle": (4, "Needles"), "Feathers": (2, "Feathers")},
+    },
+    "needle arrow": {
+        "name": "Needle Arrows (x20) 🏹",
+        "station": "Workbench Lv. 4",
+        "mats": {"Needle": (4, "Needles"), "Feathers": (2, "Feathers")},
+    },
     # Silver / Mountain Gear
     "frostner": {
         "name": "Frostner ❄️⚡",
@@ -827,12 +910,12 @@ def get_craft_report(item_query: Optional[str] = None) -> str:
             "🔨 *VALHEIM 'CAN WE CRAFT?' WISHLIST ENGINE* 📦",
             "",
             "Query any weapon, armor piece, or station to check clan materials!",
-            "• *Usage:* `!craft frostner` or `!craft wolf armor chest`",
+            "• *Usage:* `!craft porcupine` or `!craft frostner`",
             "",
             "🎯 *Popular Clan Recipes to Check:*",
-            "• *Weapons:* `!craft frostner`, `!craft draugr fang`, `!craft silver sword`",
-            "• *Armor:* `!craft wolf armor chest`, `!craft root harnesk`, `!craft iron scale mail`",
-            "• *Homestead:* `!craft longship`, `!craft dragon bed`, `!craft blast furnace`",
+            "• *Weapons:* `!craft porcupine`, `!craft black metal atgeir`, `!craft frostner`",
+            "• *Armor:* `!craft padded cuirass`, `!craft root harnesk`, `!craft lox cape`, `!craft wolf armor chest`",
+            "• *Homestead & Stations:* `!craft blast furnace`, `!craft spinning wheel`, `!craft longship`, `!craft dragon bed`",
         ]
         return "\n".join(lines)
 
@@ -848,7 +931,7 @@ def get_craft_report(item_query: Optional[str] = None) -> str:
     if not recipe:
         return (
             f"🔨 *[Crafting Check]* Could not find recipe for *'{item_query}'*!\n\n"
-            f"💡 *Try:* `!craft frostner`, `!craft draugr fang`, `!craft wolf armor chest`, `!craft longship`, or `!craft root harnesk`."
+            f"💡 *Try:* `!craft porcupine`, `!craft black metal atgeir`, `!craft padded cuirass`, `!craft root harnesk`, `!craft lox cape`, or `!craft frostner`."
         )
 
     lines = [
@@ -863,8 +946,8 @@ def get_craft_report(item_query: Optional[str] = None) -> str:
 
     for mat_key, (needed_qty, label) in recipe["mats"].items():
         # Special check for Haldor Ymir Flesh
-        if mat_key == "YmirFlesh":
-            ymir_have = totals.get("YmirFlesh", 0)
+        if mat_key in ("YmirFlesh", "YmirRemains"):
+            ymir_have = max(totals.get("YmirFlesh", 0), totals.get("YmirRemains", 0))
             haldor_cost = recipe.get("haldor_cost", 600)
             if ymir_have >= needed_qty:
                 lines.append(f"• [✅ {ymir_have}/{needed_qty}] *{label}* (In Chests)")
@@ -876,18 +959,35 @@ def get_craft_report(item_query: Optional[str] = None) -> str:
                 missing_mats.append(f"{needed_qty - ymir_have}x Ymir Flesh from Haldor")
             continue
 
-        # Check raw or smelted metals (e.g. Iron vs IronScrap)
+        # Check raw or smelted metals (e.g. Iron vs IronScrap, BlackMetal vs BlackMetalScrap, Silver vs SilverOre)
         have_qty = totals.get(mat_key, 0)
-        if mat_key == "Iron" and have_qty < needed_qty:
-            scrap = totals.get("IronScrap", 0)
-            if have_qty + scrap >= needed_qty:
-                lines.append(f"• [🟡 {have_qty}/{needed_qty}] *{label}* (+{scrap} Scrap waiting to smelt)")
-                continue
+        scrap_note = ""
+        if mat_key == "Iron":
+            scrap = totals.get("IronScrap", 0) + totals.get("IronOre", 0)
+            if scrap > 0:
+                scrap_note = f" (+{scrap} Scrap in chests waiting to smelt)"
+                if have_qty + scrap >= needed_qty:
+                    lines.append(f"• [🟡 {have_qty}/{needed_qty}] *{label}*{scrap_note}")
+                    continue
+        elif mat_key == "BlackMetal":
+            scrap = totals.get("BlackMetalScrap", 0)
+            if scrap > 0:
+                scrap_note = f" (+{scrap} Scrap in chests waiting for Blast Furnace)"
+                if have_qty + scrap >= needed_qty:
+                    lines.append(f"• [🟡 {have_qty}/{needed_qty}] *{label}*{scrap_note}")
+                    continue
+        elif mat_key == "Silver":
+            ore = totals.get("SilverOre", 0)
+            if ore > 0:
+                scrap_note = f" (+{ore} Ore in chests waiting to smelt)"
+                if have_qty + ore >= needed_qty:
+                    lines.append(f"• [🟡 {have_qty}/{needed_qty}] *{label}*{scrap_note}")
+                    continue
 
         if have_qty >= needed_qty:
             lines.append(f"• [✅ {have_qty}/{needed_qty}] *{label}*")
         else:
-            lines.append(f"• [❌ {have_qty}/{needed_qty}] *{label}*")
+            lines.append(f"• [❌ {have_qty}/{needed_qty}] *{label}*{scrap_note}")
             all_ready = False
             missing_mats.append(f"{needed_qty - have_qty}x {label}")
 

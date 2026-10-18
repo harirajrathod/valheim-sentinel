@@ -269,6 +269,9 @@ def format_farm_report() -> str:
     c_tur_s = pantry.get('TurnipSeeds', 0)
     c_oni = pantry.get('Onion', 0)
     c_oni_s = pantry.get('OnionSeeds', 0)
+    c_bar = pantry.get('Barley', 0)
+    c_flx = pantry.get('Flax', 0)
+    c_cld = pantry.get('Cloudberry', 0)
     c_hon = pantry.get('Honey', 0)
     c_blu = pantry.get('Blueberries', 0)
     c_ras = pantry.get('Raspberry', 0)
@@ -276,6 +279,10 @@ def format_farm_report() -> str:
     lines.append(f"• 🥕 *Carrots:* {c_car:,} | *Seeds:* {c_car_s:,}")
     lines.append(f"• 🌿 *Turnips:* {c_tur:,} | *Seeds:* {c_tur_s:,}")
     lines.append(f"• 🧅 *Onions:* {c_oni:,} | *Seeds:* {c_oni_s:,}")
+    if c_bar > 0 or c_flx > 0:
+        lines.append(f"• 🌾 *Plains Crops:* {c_bar:,} Barley | {c_flx:,} Flax")
+    if c_cld > 0:
+        lines.append(f"• 🫐 *Plains Forage:* {c_cld:,} Cloudberries")
     lines.append(f"• 🍯 *Honey:* {c_hon:,} jars")
     lines.append(f"• 🫐 *Berries:* {c_blu:,} Blueberries | {c_ras:,} Raspberries")
     lines.append("")

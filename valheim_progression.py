@@ -77,27 +77,40 @@ def get_progression_state():
         if is_slain:
             defeated_canonical.add(boss['key'])
 
-    # 4. Walk chain to find current tier & next boss
-    current_tier = 0
-    current_biome = 'Meadows'
+    # 4. Walk chain to find defeated bosses and active gameplay era
+    defeated_tier = 0
+    defeated_biome = 'Meadows'
     next_boss = None
     bosses_defeated = []
 
     for boss in BOSS_CHAIN:
         if boss['key'] in defeated_canonical:
             bosses_defeated.append(boss)
-            current_tier = boss['tier']
-            current_biome = boss['biome']
+            defeated_tier = boss['tier']
+            defeated_biome = boss['biome']
         else:
             if next_boss is None:
                 next_boss = boss
             # don't break — keep walking to build full defeated list
 
     all_defeated = (next_boss is None)
-    next_biome = next_boss['biome'] if next_boss else current_biome
+
+    # The ACTIVE gameplay era is the frontier currently being explored & conquered!
+    # If there is a next boss to slay, that boss's tier/biome is our active playing era.
+    # (e.g. Moder defeated -> next_boss is Yagluth -> active era is Tier 5 Plains)
+    if next_boss:
+        current_tier = next_boss['tier']
+        current_biome = next_boss['biome']
+        next_biome = next_boss.get('next_biome') or BOSS_CHAIN[min(next_boss['tier'], len(BOSS_CHAIN) - 1)]['biome']
+    else:
+        current_tier = defeated_tier
+        current_biome = defeated_biome
+        next_biome = current_biome
 
     return {
         'bosses_defeated': bosses_defeated,
+        'defeated_tier': defeated_tier,
+        'defeated_biome': defeated_biome,
         'current_tier': current_tier,
         'current_biome': current_biome,
         'next_boss': next_boss,
@@ -202,11 +215,21 @@ def get_active_boss_and_era():
         mat_key, req_cnt, mat_name, portal_tag = BOSS_TRIBUTES[boss_key]
         try:
             totals, _ = scan_world_inventory()
-            stock = totals.get(mat_key, 0)
-            if stock >= req_cnt:
-                tribute_summary = f"{stock} {mat_name} stockpiled (🔥 {req_cnt} required — {stock // req_cnt}x summon ready!)"
+            if boss_key == 'defeated_queen':
+                stock = max(totals.get('Sealbreaker', 0), totals.get('DvergrKey', 0))
+                frag_cnt = max(totals.get('DvergrKeyFragment', 0), totals.get('SealbreakerFragment', 0))
+                if stock >= req_cnt:
+                    tribute_summary = f"{stock} {mat_name} stockpiled (🔥 {req_cnt} required — {stock // req_cnt}x summon ready!)"
+                elif frag_cnt > 0:
+                    tribute_summary = f"{stock}/{req_cnt} {mat_name} stockpiled ({frag_cnt}/9 fragments gathered — need {9 - frag_cnt} more to forge)"
+                else:
+                    tribute_summary = f"{stock}/{req_cnt} {mat_name} stockpiled (Need {req_cnt - stock} more)"
             else:
-                tribute_summary = f"{stock}/{req_cnt} {mat_name} stockpiled (Need {req_cnt - stock} more)"
+                stock = totals.get(mat_key, 0)
+                if stock >= req_cnt:
+                    tribute_summary = f"{stock} {mat_name} stockpiled (🔥 {req_cnt} required — {stock // req_cnt}x summon ready!)"
+                else:
+                    tribute_summary = f"{stock}/{req_cnt} {mat_name} stockpiled (Need {req_cnt - stock} more)"
         except Exception:
             tribute_summary = f"{req_cnt} {mat_name} required"
         portal_tag = portal_tag or ""
@@ -536,7 +559,7 @@ def get_progression_report():
         f"🏰 *Current Stage:* {current_biome} (Boss Tier {current_tier}/8)",
     ]
     if next_boss:
-        lines.append(f"🎯 *Next Objective:* Slay *{next_boss['name']}* in the *{next_biome}*")
+        lines.append(f"🎯 *Next Objective:* Slay *{next_boss['name']}* in the *{next_boss['biome']}*")
     else:
         lines.append("🏆 *All Forsaken Defeated — Realm Mastered!*")
 

@@ -61,41 +61,15 @@ PLAYER_CONTAINER_PREFABS = [
 PACKED_PLAYER_HASHES = [struct.pack('<i', get_stable_hash(p)) for p in PLAYER_CONTAINER_PREFABS]
 
 def scan_world_treasury():
-    coins = 0
-    gems = 0
-    chunks = glob.glob('/root/.config/unity3d/IronGate/Valheim/worlds_local/Valheim10/*.chunk')
-    for c in chunks:
-        try:
-            with open(c, 'rb') as f:
-                data = f.read()
-            idx = 0
-            while True:
-                idx = data.find(TARGET_S_ITEMS, idx)
-                if idx == -1: break
-                p = idx + 4
-                if p + 4 > len(data): break
-                payload_len = struct.unpack('<I', data[p:p+4])[0]
-                p += 4
-                if p + payload_len <= len(data) and payload_len >= 6:
-                    payload = data[p:p+payload_len]
-                    version, count = struct.unpack('<IH', payload[:6])
-                    if version == 109 and count < 100:
-                        window = data[max(0, idx - 80):idx]
-                        if any(ph in window for ph in PACKED_PLAYER_HASHES):
-                            for i in range(6, payload_len - 5):
-                                cand_hash = struct.unpack('<i', payload[i+2:i+6])[0]
-                                if cand_hash in HASH_TO_KEY:
-                                    stack = struct.unpack('<H', payload[i:i+2])[0]
-                                    if 1 <= stack <= 999:
-                                        k = HASH_TO_KEY[cand_hash]
-                                        val = ITEM_CATALOG[k] * stack
-                                        if k == 'Coins':
-                                            coins += stack
-                                        else:
-                                            gems += val
-                idx += 4
-        except Exception:
-            pass
+    from valheim_inventory import scan_world_inventory
+    totals, _ = scan_world_inventory()
+    coins = totals.get('Coins', 0)
+    gems = (
+        totals.get('Amber', 0) * 5 +
+        totals.get('AmberPearl', 0) * 10 +
+        totals.get('Ruby', 0) * 20 +
+        totals.get('SilverNecklace', 0) * 30
+    )
     return coins, gems
 
 def generate_superlatives_report(days=7):

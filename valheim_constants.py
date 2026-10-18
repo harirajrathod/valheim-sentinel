@@ -1,3 +1,4 @@
+import os
 import struct
 import sys
 import re
@@ -41,10 +42,12 @@ PATTERNS = {
     "version":            re.compile(r"Valheim\s+(?:version:\s*)?(l-[\d\.]+.*?\(network version \d+\))"),
     "pre_seeded":         re.compile(r"Pre-seeded active players:\s*(\{[^}]*}|set\(\))"),
     "platform_id":        re.compile(r"Platform ID ((?:Steam|PlayStation|Xbox)_[a-zA-Z0-9_-]+)"),
+    "playfab_error_4098": re.compile(r"PlayFab network error .*?code '4098': the operation was called with an invalid handle"),
 
     # --- Hostile / world events ---
     "raid_event":         re.compile(r"Random event set:(\w+)"),
     "world_save":         re.compile(r"World save \((\d+)/(\d+)\)"),
+    "autobackup_saved":   re.compile(r"World auto backup saved"),
     "placed_location":    re.compile(r"Placed location (\w+) in zone (-?\d+),(-?\d+)"),
     "join_cli":           re.compile(r"Join:\s+([^\s\(]+)"),
     "leave_cli":          re.compile(r"Leave(?:\s+\([^\)]+\))?:\s+([^\s]+)"),
@@ -317,6 +320,10 @@ ITEM_CATALOG = {
     'SerpentScale': ('Serpent Scales', 0, 'mat'),
     'WolfClaw': ('Wolf Claws', 0, 'mat'),
     'Sealbreaker': ('Sealbreaker', 0, 'boss_mat'),
+    'DvergrKey': ('Sealbreaker', 0, 'boss_mat'),
+    'DvergrKeyFragment': ('Sealbreaker Fragment', 0, 'boss_mat'),
+    'SealbreakerFragment': ('Sealbreaker Fragment', 0, 'boss_mat'),
+    'YmirFlesh': ('Ymir Flesh', 0, 'mat'),
     'BellFragment': ('Bell Fragments', 0, 'boss_mat'),
     'Bloodgold': ('Bloodgold Bars', 0, 'metal'),
     'BloodgoldOre': ('Bloodgold Ore', 0, 'metal'),
@@ -340,10 +347,168 @@ ITEM_CATALOG = {
     'OozeBomb': ('Ooze Bombs', 0, 'weapon'),
     'Bilebomb': ('Bilebombs', 0, 'weapon'),
     'FishingBait': ('Fishing Bait', 0, 'tool'),
+    'FishingBaitForest': ('Mossy Fishing Bait', 0, 'tool'),
     'BarleyWine': ('Fire Resistance Barley Wine', 0, 'potion'),
+    # Agricultural, Crops & Foraging
+    'Flax': ('Flax', 0, 'food'),
+    'BeechSeeds': ('Beech Seeds', 0, 'food'),
+    'BirchSeeds': ('Birch Seeds', 0, 'food'),
+    'FirCone': ('Fir Cones', 0, 'res'),
+    'PineCone': ('Pine Cones', 0, 'res'),
+    'Acorn': ('Acorns', 0, 'food'),
+    # Swamps, Mountains, Plains & Mistlands Drops / Materials
+    'ElderBark': ('Ancient Bark', 0, 'mat'),
+    'MushroomJotunPuffs': ('Jotun Puffs', 0, 'food'),
+    'MushroomMagecap': ('Magecap Mushrooms', 0, 'food'),
+    'ChickenEgg': ('Eggs', 0, 'food'),
+    'Crystal': ('Crystal', 0, 'mat'),
+    'BlackMarble': ('Black Marble', 0, 'res'),
+    'Ectoplasm': ('Ectoplasm', 0, 'mat'),
+    'JuteRed': ('Red Jute', 0, 'mat'),
+    'WolfHairBundle': ('Wolf Hair Bundles', 0, 'mat'),
+    'ScaleHide': ('Scale Hide', 0, 'mat'),
+    'WrithanRoots': ('Writhan Roots', 0, 'mat'),
+    'SharpeningStone': ('Sharpening Stone', 0, 'mat'),
+    'RottenMeat': ('Rotten Meat', 0, 'food'),
+    'Pukeberries': ('Pukeberries', 0, 'food'),
+    'WolfMeatSkewer': ('Wolf Meat Skewers', 0, 'food'),
+    'BreadDough': ('Bread Dough', 0, 'food'),
+    'FishCooked': ('Cooked Fish', 0, 'food'),
+    'MeadTamer': ('Mead Tamer', 0, 'potion'),
+    'YmirRemains': ('Ymir Flesh', 0, 'mat'),
+    # Bear Drops & Beast Materials
+    'BjornHide': ('Bear Hide', 0, 'mat'),
+    'BjornPaw': ('Bear Paws', 0, 'mat'),
+    'BjornMeat': ('Bear Meat', 0, 'food'),
+    'UndeadBjornRibcage': ('Undead Bear Ribcage', 0, 'mat'),
+    'FistBjornClaw': ('Bear Claw Fists', 0, 'weapon'),
+    # Tools, Saddles & Utilities
+    'Tankard': ('Tankard', 0, 'tool'),
+    'Hammer': ('Hammer', 0, 'tool'),
+    'Hoe': ('Hoe', 0, 'tool'),
+    'Torch': ('Torch', 0, 'tool'),
+    'FishingRod': ('Fishing Rod', 0, 'tool'),
+    'SaddleLox': ('Lox Saddle', 0, 'tool'),
+    'BeltStrength': ('Megingjord (+150 Weight)', 0, 'tool'),
+    'Fish12': ('Northern Salmon', 0, 'food'),
+    'Fish5': ('Trollfish', 0, 'food'),
+    # Weapons & Bows
+    'MaceIron': ('Iron Mace', 0, 'weapon'),
+    'MaceSilver': ('Frostner', 0, 'weapon'),
+    'MaceBronze': ('Bronze Mace', 0, 'weapon'),
+    'BowFineWood': ('Finewood Bow', 0, 'weapon'),
+    'BowDraugrFang': ('Draugr Fang', 0, 'weapon'),
+    'SwordSilver': ('Silver Sword', 0, 'weapon'),
+    'SwordWood': ('Wooden Sword', 0, 'weapon'),
+    'AxeStone': ('Stone Axe', 0, 'tool'),
+    'AxeBronze': ('Bronze Axe', 0, 'tool'),
+    'AxeIron': ('Iron Axe', 0, 'tool'),
+    'PickaxeAntler': ('Antler Pickaxe', 0, 'tool'),
+    'PickaxeIron': ('Iron Pickaxe', 0, 'tool'),
+    'SledgeStagbreaker': ('Stagbreaker', 0, 'weapon'),
+    'SledgeWood': ('Wooden Sledge', 0, 'weapon'),
+    'SpearFlint': ('Flint Spear', 0, 'weapon'),
+    'SpearBronze': ('Bronze Spear', 0, 'weapon'),
+    'SpearChitin': ('Abyssal Harpoon', 0, 'weapon'),
+    'AtgeirBronze': ('Bronze Atgeir', 0, 'weapon'),
+    'AtgeirWood': ('Wooden Atgeir', 0, 'weapon'),
+    'BattleaxeCrystal': ('Crystal Battleaxe', 0, 'weapon'),
+    'BattleaxeWood': ('Wooden Battleaxe', 0, 'weapon'),
+    'BombOoze': ('Ooze Bombs', 0, 'weapon'),
+    # Armor, Cloaks & Shields
+    'ArmorIronLegs': ('Iron Greaves', 0, 'armor'),
+    'ArmorIronChest': ('Iron Scale Mail', 0, 'armor'),
+    'HelmetIron': ('Iron Helmet', 0, 'armor'),
+    'ArmorWolfLegs': ('Wolf Armor Legs', 0, 'armor'),
+    'ArmorWolfChest': ('Wolf Armor Chest', 0, 'armor'),
+    'HelmetDrake': ('Drake Helmet', 0, 'armor'),
+    'CapeWolf': ('Wolf Fur Cape', 0, 'armor'),
+    'CapeDeerHide': ('Deer Hide Cape', 0, 'armor'),
+    'ArmorTrollLeatherLegs': ('Troll Leather Pants', 0, 'armor'),
+    'ArmorTrollLeatherChest': ('Troll Leather Tunic', 0, 'armor'),
+    'HelmetTrollLeather': ('Troll Leather Helmet', 0, 'armor'),
+    'CapeTrollHide': ('Troll Hide Cape', 0, 'armor'),
+    'HelmetRoot': ('Root Mask', 0, 'armor'),
+    'ShieldRoots': ('Root Shield', 0, 'armor'),
+    'ShieldSilver': ('Silver Shield', 0, 'armor'),
+    'ShieldIronTower': ('Iron Tower Shield', 0, 'armor'),
+    'ShieldWood': ('Wood Shield', 0, 'armor'),
+    'ShieldBoneTower': ('Bone Tower Shield', 0, 'armor'),
+    'HelmetFenring': ('Fenris Hood', 0, 'armor'),
+    'ArmorFenringChest': ('Fenris Coat', 0, 'armor'),
+    'ArmorFenringLegs': ('Fenris Leggings', 0, 'armor'),
+    'HelmetBronze': ('Bronze Helmet', 0, 'armor'),
+    'ArmorBronzeChest': ('Bronze Plate Cuirass', 0, 'armor'),
+    'ArmorBronzeLegs': ('Bronze Plate Leggings', 0, 'armor'),
+    'HelmetLeather': ('Leather Helmet', 0, 'armor'),
+    'ArmorLeatherChest': ('Leather Tunic', 0, 'armor'),
+    'ArmorLeatherLegs': ('Leather Pants', 0, 'armor'),
+    'ArmorBerserkerChest': ('Berserker Tunic', 0, 'armor'),
+    'ArmorBerserkerLegs': ('Berserker Leggings', 0, 'armor'),
+    'HelmetBerserkerHood': ('Berserker Hood', 0, 'armor'),
+    'HelmetPointyHat': ('Pointy Hat', 0, 'armor'),
+    'TrinketBronzeHealth': ('Bronze Health Trinket', 0, 'tool'),
+    # Trophies
+    'TrophyDraugr': ('Draugr Trophies', 0, 'trophy'),
+    'TrophyDraugrElite': ('Draugr Elite Trophies', 0, 'trophy'),
+    'TrophySurtling': ('Surtling Trophies', 0, 'trophy'),
+    'TrophyWolf': ('Wolf Trophies', 0, 'trophy'),
+    'TrophyLox': ('Lox Trophies', 0, 'trophy'),
+    'TrophyAbomination': ('Abomination Trophies', 0, 'trophy'),
+    'TrophyFrostTroll': ('Frost Troll Trophies', 0, 'trophy'),
+    'TrophyGhost': ('Ghost Trophies', 0, 'trophy'),
+    'TrophyHatchling': ('Hatchling Trophies', 0, 'trophy'),
+    'TrophyUlv': ('Ulv Trophies', 0, 'trophy'),
+    'TrophyBlob': ('Blob Trophies', 0, 'trophy'),
+    'TrophyLeech': ('Leech Trophies', 0, 'trophy'),
+    'TrophyDeathsquito': ('Deathsquito Trophies', 0, 'trophy'),
+    'TrophyWraith': ('Wraith Trophies', 0, 'trophy'),
+    'TrophyCultist_Hildir': ('Cultist Trophy (Hildir)', 0, 'trophy'),
+    'TrophySkeletonHildir': ('Skeleton Trophy (Hildir)', 0, 'trophy'),
+    'TrophyWrithan': ('Writhan Trophies', 0, 'trophy'),
+    'TrophyGoblin': ('Fuling Trophies', 0, 'trophy'),
+    'TrophyGoblinBruteBrosBrute': ('Brute Trophy', 0, 'trophy'),
+    # Station Upgraders
+    'Upgrader0Armor': ('Armor Station Upgrade I', 0, 'mat'),
+    'Upgrader1Armor': ('Armor Station Upgrade II', 0, 'mat'),
+    'Upgrader2Armor': ('Armor Station Upgrade III', 0, 'mat'),
+    'Upgrader3Armor': ('Armor Station Upgrade IV', 0, 'mat'),
+    'Upgrader4Armor': ('Armor Station Upgrade V', 0, 'mat'),
+    'Upgrader5Armor': ('Armor Station Upgrade VI', 0, 'mat'),
+    'Upgrader0Weapon': ('Weapon Station Upgrade I', 0, 'mat'),
+    'Upgrader1Weapon': ('Weapon Station Upgrade II', 0, 'mat'),
+    'Upgrader2Weapon': ('Weapon Station Upgrade III', 0, 'mat'),
+    'Upgrader3Weapon': ('Weapon Station Upgrade IV', 0, 'mat'),
+    'Upgrader4Weapon': ('Weapon Station Upgrade V', 0, 'mat'),
+    'Upgrader5Weapon': ('Weapon Station Upgrade VI', 0, 'mat'),
 }
 
 HASH_TO_KEY = {get_stable_hash(k): k for k in ITEM_CATALOG}
+# Canonical aliases
+HASH_TO_KEY[get_stable_hash('AncientBark')] = 'ElderBark'
+HASH_TO_KEY[get_stable_hash('JotunPuffs')] = 'MushroomJotunPuffs'
+HASH_TO_KEY[get_stable_hash('Magecap')] = 'MushroomMagecap'
+HASH_TO_KEY[get_stable_hash('Egg')] = 'ChickenEgg'
+HASH_TO_KEY[get_stable_hash('DvergrKey')] = 'Sealbreaker'
+HASH_TO_KEY[get_stable_hash('DvergrKeyFragment')] = 'SealbreakerFragment'
+HASH_TO_KEY[get_stable_hash('YmirFlesh')] = 'YmirRemains'
+
+# Dynamic SoftRef fallback for any newly added game prefabs
+_SOFTREF_MANIFEST = '/root/valheim_server/valheim_server_Data/StreamingAssets/SoftRef/manifest_extended'
+if os.path.exists(_SOFTREF_MANIFEST):
+    try:
+        with open(_SOFTREF_MANIFEST, 'rb') as _f:
+            _words = set(re.findall(rb'[A-Za-z0-9_]{3,40}', _f.read()))
+        for _w in _words:
+            _name = _w.decode('ascii', errors='ignore')
+            _h = get_stable_hash(_name)
+            if _h not in HASH_TO_KEY:
+                _clean_title = re.sub(r'([a-z])([A-Z])', r'\1 \2', _name).title()
+                ITEM_CATALOG[_name] = (_clean_title, 0, 'item')
+                HASH_TO_KEY[_h] = _name
+    except Exception:
+        pass
+
 TARGET_S_ITEMS = struct.pack('<i', -938864442)
 
 # Player-built container prefabs (chests, carts, ships)

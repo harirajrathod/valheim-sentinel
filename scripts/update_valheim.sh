@@ -22,11 +22,19 @@ fi
 
 # 2. Gracefully stop running server
 if pgrep -f "valheim_server.x86_64" >/dev/null; then
-    echo "Stopping active Valheim server..."
+    echo "Stopping active Valheim server gracefully..."
+    touch "$VALHEIM_DIR/.stop_server"
+    pkill -SIGINT -f "valheim_server.x86_64" 2>/dev/null || true
+    for i in {1..15}; do
+        if ! pgrep -f "valheim_server.x86_64" >/dev/null; then
+            break
+        fi
+        sleep 1
+    done
     tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true
-    sleep 5
-    # Force kill if still hanging
+    # Force kill only if still hanging after 15s
     pkill -9 -f "valheim_server.x86_64" 2>/dev/null || true
+    rm -f "$VALHEIM_DIR/.stop_server"
     sleep 2
     echo "Server stopped."
 fi

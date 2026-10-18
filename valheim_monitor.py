@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import re
+import json
 from datetime import datetime, timezone
 from collections import Counter
 import glob
@@ -121,6 +122,7 @@ PLAYER_STATE_FILE   = "/root/valheim_player_state.json"
 ACTIVE_SESSIONS_FILE = "/root/valheim_active_sessions.json"
 TRADER_STATE_FILE   = "/root/valheim_known_traders.json"
 HILDIR_STATE_FILE   = "/root/valheim_hildir_quests.json"
+PLAYFAB_STATE_FILE  = "/root/valheim_playfab_state.json"
 
 TRADER_LOC_MAP = {
     "Vendor_BlackForest": ("🪙", "Haldor the Merchant", "Black Forest", "Equipment, Dvergr Circlets & Ymir Flesh are now tradeable!"),
@@ -165,6 +167,120 @@ def save_player_state(name: str, summary: Dict[str, Any]) -> None:
     states = load_player_states()
     states[name] = summary
     atomic_save_json(PLAYER_STATE_FILE, states)
+
+
+def load_playfab_state() -> Dict[str, Any]:
+    return safe_load_json(PLAYFAB_STATE_FILE, default={
+        "desync_pending": False,
+        "last_error_time": 0.0,
+        "last_restart_time": 0.0,
+        "last_alert_time": 0.0,
+        "error_count": 0
+    })
+
+
+def save_playfab_state(state: Dict[str, Any]) -> None:
+    atomic_save_json(PLAYFAB_STATE_FILE, state)
+
+
+def run_playfab_autoheal(
+    reason: str = "empty_server",
+    dry_run: bool = False,
+    force: bool = False,
+    active_players: Optional[Set[str]] = None,
+    active_raid: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Safely flushes and restarts Valheim server to resolve PlayFab Error 4098 lobby wedging.
+    Guards:
+      1. Cooldown: At least 10 minutes (600s) between automated restarts (unless force=True).
+      2. Active Players: Never restart if players are online (unless force=True).
+      3. Active Raid: Never restart while a raid is active (unless force=True).
+    Supports hermetic dry_run testing.
+    """
+    now_t = time.time()
+    pf_state = load_playfab_state()
+
+    # 1. Cooldown guard
+    if not force and not dry_run and (now_t - pf_state.get("last_restart_time", 0) < 600):
+        remaining = int(600 - (now_t - pf_state.get("last_restart_time", 0)))
+        print(f"[PlayFab Watchdog] Skipping auto-heal ({reason}): on 10m cooldown ({remaining}s remaining).")
+        return {"success": False, "skipped": True, "reason": "cooldown", "remaining_seconds": remaining}
+
+    # 2. Active player guard
+    if active_players is not None:
+        p_count = len(active_players)
+    else:
+        try:
+            import valheim_whatsapp_action
+            info = valheim_whatsapp_action.get_server_info()
+            p_count = info.get("player_count", 0)
+        except Exception:
+            p_count = 0
+
+    if not force and p_count > 0:
+        print(f"[PlayFab Watchdog] Suppressing auto-heal: {p_count} players still online.")
+        return {"success": False, "suppressed": True, "reason": "players_online", "player_count": p_count}
+
+    # 3. Active raid guard
+    if not force and active_raid:
+        print(f"[PlayFab Watchdog] Suppressing auto-heal: Raid {active_raid.get('key')} is active.")
+        return {"success": False, "suppressed": True, "reason": "active_raid", "raid_key": active_raid.get("key")}
+
+    print(f"[PlayFab Watchdog] Initiating safe auto-heal restart (reason: {reason}, dry_run={dry_run})...")
+    try:
+        import valheim_whatsapp_action
+        res = valheim_whatsapp_action.graceful_restart(dry_run=dry_run)
+        if res.get("success"):
+            jcode = res.get("join_code", "Unknown")
+            if not dry_run:
+                pf_state["desync_pending"] = False
+                pf_state["last_restart_time"] = now_t
+                save_playfab_state(pf_state)
+
+                try:
+                    from valheim_backup_drive import trigger_drive_backup_async
+                    trigger_drive_backup_async(trigger="playfab_autoheal", create_snapshot=True)
+                except Exception as ex_b:
+                    print(f"[PlayFab Watchdog] Warning creating drive snapshot: {ex_b}")
+
+                if "Disabled" in str(jcode):
+                    net_wa = "• *Network Mode:* Direct Steam Sockets (72.62.227.29:2458)"
+                    net_tg = "Mode: <b>Direct Steam Sockets</b> (<code>72.62.227.29:2458</code>)"
+                else:
+                    net_wa = f"• *New Join Code:* `{jcode}` (Port 2458)"
+                    net_tg = f"New Join Code: <code>{jcode}</code>"
+
+                msg_wa = (
+                    f"🛡️ *[Valheim SRE Auto-Heal]*\n\n"
+                    f"• *Issue Addressed:* Microsoft PlayFab socket desync (Error 4098)\n"
+                    f"• *Action Taken:* Stale lobby cleanly cleared while realm was empty\n"
+                    f"{net_wa}\n"
+                    f"• *Status:* 100% pristine lobby ready for next session! ⚔️"
+                )
+                print(f"[PlayFab Watchdog] Auto-heal succeeded. Join code: {jcode}")
+                send_whatsapp(msg_wa)
+                if ENABLE_TELEGRAM:
+                    send_telegram(
+                        f"🛡️ <b>Valheim Auto-Heal</b>: Stale PlayFab lobby cleanly flushed. {net_tg}"
+                    )
+            else:
+                print(f"[PlayFab Watchdog] Dry-run auto-heal verified successfully. Simulated join code: {jcode}")
+
+            return {
+                "success": True,
+                "dry_run": dry_run,
+                "join_code": jcode,
+                "reason": reason,
+                "timestamp": now_t
+            }
+        else:
+            err = res.get("error", "Unknown restart error")
+            print(f"[PlayFab Watchdog] Auto-heal restart failed: {err}")
+            return {"success": False, "error": err}
+    except Exception as e:
+        print(f"[PlayFab Watchdog] Error executing auto-heal restart: {e}")
+        return {"success": False, "error": str(e)}
 
 
 def load_active_sessions() -> Dict[str, Any]:
@@ -603,6 +719,22 @@ def monitor() -> None:
     active_raid: Optional[Dict[str, Any]] = None
     last_completed_raid: Optional[Dict[str, Any]] = None
     last_poi_alerts: Dict[str, float] = {}
+    playfab_state: Dict[str, Any] = load_playfab_state()
+    try:
+        if playfab_state.get("desync_pending"):
+            import subprocess
+            res_p = subprocess.run(["pgrep", "-f", "valheim_server.x86_64"], capture_output=True, text=True)
+            pids = res_p.stdout.strip().split()
+            if pids:
+                proc_start = os.stat(f"/proc/{pids[0]}").st_mtime
+                if proc_start > playfab_state.get("last_error_time", 0):
+                    print(f"[PlayFab Watchdog] Clearing stale desync_pending: server rebooted at {proc_start} after error at {playfab_state.get('last_error_time')}.")
+                    playfab_state["desync_pending"] = False
+                    save_playfab_state(playfab_state)
+    except Exception as ex_pf:
+        print(f"[PlayFab Watchdog] Error checking process mtime: {ex_pf}")
+    last_empty_server_time: Optional[float] = time.time() if not active_names else None
+    last_autoheal_check_time: float = time.time()
 
     # Restore any ongoing raid state
     saved_state = load_raid_state()
@@ -652,12 +784,37 @@ def monitor() -> None:
     raid_re         = PATTERNS["raid_event"]          # Random event set:<name>
     boss_re         = PATTERNS["boss_defeat_monitor"] # defeated_<something> (any boss key)
     save_re         = PATTERNS["world_save"]          # World save (N/M)
+    autobackup_re   = PATTERNS.get("autobackup_saved") # World auto backup saved
     loc_re          = PATTERNS["placed_location"]     # Placed location <loc> in zone x,y
+    playfab_4098_re = PATTERNS.get("playfab_error_4098")
+
+    def perform_playfab_autoheal(reason: str = "empty_server", dry_run: bool = False, force: bool = False) -> bool:
+        """
+        Safely flushes and restarts Valheim server to resolve PlayFab Error 4098 lobby wedging.
+        Only executed when active_names is empty and no active raid is running.
+        Delegates to canonical run_playfab_autoheal.
+        """
+        nonlocal playfab_state, last_empty_server_time
+        res = run_playfab_autoheal(
+            reason=reason,
+            dry_run=dry_run,
+            force=force,
+            active_players=active_names,
+            active_raid=active_raid
+        )
+        if res.get("success") and not dry_run:
+            playfab_state = load_playfab_state()
+            last_empty_server_time = time.time()
+            return True
+        return res.get("success", False)
 
     def handle_leave(name: str, reason: str = "", announce: bool = True) -> None:
+        nonlocal last_empty_server_time
         if name not in active_names:
             return
         active_names.remove(name)
+        if not active_names:
+            last_empty_server_time = time.time()
         owner = name_to_owner.pop(name, None)
         if owner:
             owner_to_name.pop(owner, None)
@@ -812,6 +969,17 @@ def monitor() -> None:
         if now_curr - last_db_check_time > 60:
             run_db_and_farm_checks()
 
+        # PlayFab Auto-Heal Watchdog check
+        if now_curr - last_autoheal_check_time >= 15:
+            last_autoheal_check_time = now_curr
+            if playfab_state.get("desync_pending"):
+                if not active_names:
+                    if last_empty_server_time is None:
+                        last_empty_server_time = now_curr
+                    elif (now_curr - last_empty_server_time) >= 30:
+                        print(f"[PlayFab Watchdog] Realm has been empty for {int(now_curr - last_empty_server_time)}s with pending desync. Auto-healing...")
+                        perform_playfab_autoheal(reason="empty_after_desync")
+
         line = file.readline()
         if not line:
             if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) < file.tell():
@@ -856,6 +1024,7 @@ def monitor() -> None:
 
                 if name not in active_names:
                     active_names.add(name)
+                    last_empty_server_time = None
                     last_states = load_player_states()
                     last_state = last_states.get(name)
                     join_msg_wa = get_session_resume_message(name, last_state, target="whatsapp")
@@ -974,18 +1143,21 @@ def monitor() -> None:
 
         # Zero connections sanity flush
         m_zero = zero_re.search(line)
-        if m_zero and active_names:
-            try:
-                import valheim_whatsapp_action
-                srv = valheim_whatsapp_action.get_server_info()
-                if srv.get("player_count", 0) > 0:
-                    print(f"[Monitor] zero_re matched '{line.strip()}', but server reports {srv['player_count']} online {srv.get('players')}. Suppressing false eviction.")
-                    continue
-            except Exception as e:
-                print(f"[Monitor] Error verifying active count on zero_re: {e}")
+        if m_zero:
+            if active_names:
+                try:
+                    import valheim_whatsapp_action
+                    srv = valheim_whatsapp_action.get_server_info()
+                    if srv.get("player_count", 0) > 0:
+                        print(f"[Monitor] zero_re matched '{line.strip()}', but server reports {srv['player_count']} online {srv.get('players')}. Suppressing false eviction.")
+                        continue
+                except Exception as e:
+                    print(f"[Monitor] Error verifying active count on zero_re: {e}")
 
-            for name in list(active_names):
-                handle_leave(name, reason="zero_flush", announce=False)
+                for name in list(active_names):
+                    handle_leave(name, reason="zero_flush", announce=False)
+            if not active_names and last_empty_server_time is None:
+                last_empty_server_time = time.time()
 
         # Horn of War: Random Event / Raid Alert
         m_raid = raid_re.search(line)
@@ -1092,13 +1264,69 @@ def monitor() -> None:
                 print(f"Trader discovered: {loc_name}")
                 send_whatsapp(msg)
 
-        # World Save trigger for immediate DB2 check
+        # World Save trigger: runs DB2 check and triggers non-blocking Drive backup on completion
         m_save = save_re.search(line)
         if m_save:
-            run_db_and_farm_checks()
+            # Valheim logs (1/5) through (5/5). Trigger once when final stage is done.
+            if m_save.group(1) == m_save.group(2):
+                run_db_and_farm_checks()
+                try:
+                    from valheim_backup_drive import trigger_drive_backup_async
+                    trigger_drive_backup_async(trigger="autosave")
+                except Exception as ex_sync:
+                    print(f"[Monitor] Warning: Could not trigger drive backup: {ex_sync}")
+
+        # World Auto-Backup trigger: creates milestone compressed snapshot archive on Drive
+        if autobackup_re and autobackup_re.search(line):
+            try:
+                from valheim_backup_drive import trigger_drive_backup_async
+                trigger_drive_backup_async(trigger="autobackup", create_snapshot=True)
+            except Exception as ex_sync:
+                print(f"[Monitor] Warning: Could not trigger drive autobackup: {ex_sync}")
+
+        # PlayFab Error 4098 Detection (Lobby / Socket desync)
+        if playfab_4098_re and playfab_4098_re.search(line):
+            now_t = time.time()
+            playfab_state["desync_pending"] = True
+            playfab_state["last_error_time"] = now_t
+            playfab_state["error_count"] = playfab_state.get("error_count", 0) + 1
+            save_playfab_state(playfab_state)
+            print(f"[PlayFab Watchdog] Detected Error 4098 in log. Active players: {len(active_names)}. desync_pending=True")
+
+            if not active_names:
+                print("[PlayFab Watchdog] Server is currently empty. Triggering immediate auto-heal...")
+                perform_playfab_autoheal(reason="error_4098_while_empty")
+            else:
+                if now_t - playfab_state.get("last_alert_time", 0) > 3600:
+                    playfab_state["last_alert_time"] = now_t
+                    save_playfab_state(playfab_state)
+                    warn_msg = (
+                        "⚠️ *[Valheim Network Notice]*\n\n"
+                        "Microsoft PlayFab relay reported socket desync (`Error 4098`).\n"
+                        "• Currently connected players can keep playing normally.\n"
+                        "• New player connections may fail.\n"
+                        "• *Auto-Heal:* The server will automatically flush and refresh the lobby once all players log off, or type `!restart` in chat to cycle it now."
+                    )
+                    send_whatsapp(warn_msg)
+            continue
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Valheim Activity & PlayFab Auto-Heal Monitor")
+    parser.add_argument("--dry-run-autoheal", action="store_true", help="Perform hermetic dry-run test of PlayFab auto-heal")
+    parser.add_argument("--status-playfab", action="store_true", help="Display current PlayFab watchdog state as JSON")
+    args = parser.parse_args()
+
+    if args.status_playfab:
+        st = load_playfab_state()
+        print(json.dumps(st, indent=2))
+        sys.exit(0)
+    elif args.dry_run_autoheal:
+        res = run_playfab_autoheal(reason="cli_dry_run", dry_run=True, force=True)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("success") else 1)
+
     try:
         monitor()
     except KeyboardInterrupt:

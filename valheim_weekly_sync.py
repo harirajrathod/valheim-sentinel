@@ -95,6 +95,8 @@ def run_weekly_sync(dry_run=False):
                 "WitheredBone": withered_bones,
                 "DragonEgg": dragon_eggs,
                 "GoblinTotem": goblin_totems,
+                "Sealbreaker": totals.get("Sealbreaker", 0) or totals.get("DvergrKey", 0),
+                "DvergrKeyFragment": totals.get("DvergrKeyFragment", 0) or totals.get("SealbreakerFragment", 0),
                 "Coins": coins,
                 "Ruby": rubies,
                 "Amber": amber,
@@ -107,7 +109,14 @@ def run_weekly_sync(dry_run=False):
                 "Obsidian": obsidian
             }
             print("✓ Key Stockpiles Audited:")
-            print(f"  • Yagluth Summon (Fuling Totems): {goblin_totems}/5 ({'🔥 Ready' if goblin_totems >= 5 else 'Need more'})")
+            try:
+                from valheim_progression import get_active_boss_and_era
+                active_info = get_active_boss_and_era()
+                target_boss = active_info.get("target_boss", "Frontier Boss")
+                tribute_summary = active_info.get("tribute_summary", "")
+                print(f"  • {target_boss} Summon: {tribute_summary}")
+            except Exception:
+                print(f"  • Yagluth Summon (Fuling Totems): {goblin_totems}/5 ({'🔥 Ready' if goblin_totems >= 5 else 'Need more'})")
             print(f"  • Treasury: {coins} Coins, {rubies} Rubies, {amber} Amber")
             print(f"  • Metallurgy: {iron} Iron, {silver} Silver, {cop} Copper, {tin} Tin, {brz} Bronze, {obsidian} Obsidian")
 

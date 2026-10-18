@@ -500,7 +500,12 @@ class TestValheimQoL(unittest.TestCase):
         frostner_rep = vq.get_craft_report("frostner")
         self.assertIn("CRAFTING CHECK: Frostner", frostner_rep)
         self.assertIn("Silver", frostner_rep)
-        self.assertIn("Treasury", frostner_rep)
+        self.assertTrue("Treasury" in frostner_rep or "In Chests" in frostner_rep)
+
+        # Explicit hermetic Haldor Treasury test when Ymir Flesh is not in chests
+        with mock.patch("valheim_qol.scan_world_inventory", return_value=({"Coins": 1500, "Silver": 50}, 5)):
+            haldor_rep = vq.get_craft_report("frostner")
+            self.assertIn("Treasury", haldor_rep)
 
         # Ready item check with hermetic mock
         with mock.patch("valheim_qol.scan_world_inventory", return_value=({"FineWood": 50, "Silver": 50}, 10)):

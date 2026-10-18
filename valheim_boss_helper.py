@@ -21,16 +21,12 @@ from valheim_utils import (
     WHATSAPP_BRIDGE_URL,
     IST,
     LOG_FILE,
+    safe_load_json,
+    atomic_save_json,
+    format_player_name,
 )
 
 BOSS_BATTLES_FILE = "/root/valheim_boss_battles.json"
-
-def format_player_name(name: str) -> str:
-    if not name:
-        return ""
-    if name.strip().lower() in ("musashi", "musashi(musa bhai)", "musa bhai"):
-        return "Musashi(Musa Bhai)"
-    return name
 
 BOSS_DATA = {
     "defeated_eikthyr": {
@@ -180,22 +176,17 @@ BOSS_DATA = {
 }
 # Alias for game engine's internal Moder defeat key
 BOSS_DATA["defeated_dragon"] = BOSS_DATA["defeated_writhan"]
+# Alias for Yagluth defeat key
+BOSS_DATA["defeated_yagluth"] = BOSS_DATA["defeated_goblinking"]
 
 def load_boss_battles():
-    if os.path.exists(BOSS_BATTLES_FILE):
-        try:
-            with open(BOSS_BATTLES_FILE, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading {BOSS_BATTLES_FILE}: {e}", file=sys.stderr)
-    return {}
+    return safe_load_json(BOSS_BATTLES_FILE, default={})
 
 def save_boss_battle(boss_key, battle_data):
     try:
         battles = load_boss_battles()
         battles[boss_key] = battle_data
-        with open(BOSS_BATTLES_FILE, "w") as f:
-            json.dump(battles, f, indent=2)
+        atomic_save_json(BOSS_BATTLES_FILE, battles)
     except Exception as e:
         print(f"Error saving {BOSS_BATTLES_FILE}: {e}", file=sys.stderr)
 
@@ -230,9 +221,11 @@ def analyze_boss_battle(boss_key, defeat_time_dt=None, active_players=None, log_
     players_seen = set()
     if active_players:
         if isinstance(active_players, (set, list)):
-            players_seen.update(active_players)
+            for ap in active_players:
+                if ap:
+                    players_seen.add(format_player_name(ap))
         elif isinstance(active_players, str):
-            players_seen.add(active_players)
+            players_seen.add(format_player_name(active_players))
 
     if os.path.exists(log_file):
         try:
@@ -253,16 +246,18 @@ def analyze_boss_battle(boss_key, defeat_time_dt=None, active_players=None, log_
                     if ": 0:0" in line:
                         m_death = re.search(r"Got character ZDOID from ([^:]+) : 0:0", line)
                         if m_death:
-                            pname = m_death.group(1).strip()
-                            if pname and pname != "0":
+                            raw_p = m_death.group(1).strip()
+                            if raw_p and raw_p != "0":
+                                pname = format_player_name(raw_p)
                                 deaths.append((dt, pname))
                                 players_seen.add(pname)
                     elif "Got character ZDOID from " in line:
                         m_join = re.search(r"Got character ZDOID from ([^:]+) : (-?\d+):", line)
                         if m_join:
-                            pname = m_join.group(1).strip()
+                            raw_p = m_join.group(1).strip()
                             owner = m_join.group(2).strip()
-                            if pname and owner != "0":
+                            if raw_p and owner != "0":
+                                pname = format_player_name(raw_p)
                                 players_seen.add(pname)
         except Exception as e:
             print(f"Error scanning log for boss battle: {e}", file=sys.stderr)
@@ -381,7 +376,23 @@ def format_boss_assessment_message(boss_key, battle_data, day=None):
     dur_mins = battle_data.get("duration_minutes", 15)
     total_falls = battle_data.get("total_falls", 0)
     time_range = battle_data.get("time_range_ist", "Recent Battle")
-    warriors = battle_data.get("warriors", {})
+    raw_warriors = battle_data.get("warriors", {})
+    # Defensive deduplication & normalization of warriors dict
+    warriors = {}
+    for p_key, p_info in raw_warriors.items():
+        norm_name = format_player_name(p_key)
+        if norm_name not in warriors:
+            warriors[norm_name] = dict(p_info)
+        else:
+            w_existing = warriors[norm_name]
+            f1 = w_existing.get("falls", 0)
+            f2 = p_info.get("falls", 0)
+            w_existing["falls"] = max(f1, f2)
+            w_existing["corpse_runs"] = max(w_existing.get("corpse_runs", 0), p_info.get("corpse_runs", 0))
+            if f2 > f1 or (f2 > 0 and f1 == 0):
+                w_existing["title"] = p_info.get("title", w_existing.get("title"))
+                w_existing["desc"] = p_info.get("desc", w_existing.get("desc"))
+
     w_count = len(warriors)
     day_str = f"Day {day}" if day else "the realm"
 
@@ -496,15 +507,9 @@ def main():
             # Update valheim_bosses_defeated.json
             boss_state_file = "/root/valheim_bosses_defeated.json"
             known = set()
-            if os.path.exists(boss_state_file):
-                try:
-                    with open(boss_state_file) as f:
-                        known = set(json.load(f))
-                except Exception:
-                    pass
+            known = set(safe_load_json(boss_state_file, default=[]))
             known.add(boss_key)
-            with open(boss_state_file, "w") as f:
-                json.dump(sorted(list(known)), f, indent=2)
+            atomic_save_json(boss_state_file, sorted(list(known)))
 
         if args.post and not args.dry_run:
             post_to_whatsapp(msg)
