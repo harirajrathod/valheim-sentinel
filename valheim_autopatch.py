@@ -543,6 +543,16 @@ def verify_and_get_info(timeout: int = 60, dry_run: bool = False) -> Tuple[bool,
     version = "Unknown"
     join_code = "Unknown"
 
+    start_script = os.path.join(VALHEIM_DIR, "start_valheim.sh")
+    crossplay_configured = False
+    try:
+        if os.path.exists(start_script):
+            with open(start_script, "r", encoding="utf-8", errors="ignore") as f:
+                crossplay_configured = "-crossplay" in f.read()
+    except Exception:
+        pass
+
+    server_connected = False
     while time.time() - start_time < timeout:
         if not is_server_running():
             log("Server process terminated unexpectedly during verification!")
@@ -561,13 +571,21 @@ def verify_and_get_info(timeout: int = 60, dry_run: bool = False) -> Tuple[bool,
                         m_code = re.search(r'join code\s+(\d+)', line)
                         if m_code:
                             join_code = m_code.group(1)
+                    if "Game server connected" in line:
+                        server_connected = True
+
+                if crossplay_configured:
                     if version != "Unknown" and join_code != "Unknown":
                         return True, version, join_code
+                else:
+                    if version != "Unknown" and server_connected:
+                        return True, version, "Disabled (Direct IP: 72.62.227.29:2458)"
             except Exception:
                 pass
         time.sleep(3)
 
-    return is_server_running(), version, join_code
+    final_code = join_code if crossplay_configured else "Disabled (Direct IP: 72.62.227.29:2458)"
+    return is_server_running(), version, final_code
 
 
 # --- Orchestrator ---
@@ -575,6 +593,15 @@ def verify_and_get_info(timeout: int = 60, dry_run: bool = False) -> Tuple[bool,
 def perform_patch(old_build: str, new_build: str, dry_run: bool = False) -> bool:
     """Executes the automated patching pipeline."""
     log(f"Initiating patch upgrade: Build {old_build} -> {new_build} (dry_run={dry_run})")
+
+    start_script = os.path.join(VALHEIM_DIR, "start_valheim.sh")
+    crossplay_configured = False
+    try:
+        if os.path.exists(start_script):
+            with open(start_script, "r", encoding="utf-8", errors="ignore") as f:
+                crossplay_configured = "-crossplay" in f.read()
+    except Exception:
+        pass
 
     # 1. Backup
     backup_path = backup_worlds(dry_run=dry_run)
@@ -610,11 +637,14 @@ def perform_patch(old_build: str, new_build: str, dry_run: bool = False) -> bool
 
         notes = get_or_fetch_patch_notes(target_version=version)
 
+        conn_tg = f"• <b>Join Code:</b> <code>{join_code}</code> (Port 2458)" if crossplay_configured else f"• <b>Network Mode:</b> Direct Steam Sockets (<code>72.62.227.29:2458</code>)"
+        conn_wa = f"• *Join Code:* `{join_code}` (Port 2458)" if crossplay_configured else f"• *Network Mode:* Direct Steam Sockets (`72.62.227.29:2458`)"
+
         msg = (
             f"🛡️ <b>Valheim Server Auto-Patched!</b>\n\n"
             f"• <b>Build ID:</b> <code>{old_build}</code> ➔ <code>{new_build}</code>\n"
             f"• <b>Version:</b> <code>{version}</code>\n"
-            f"• <b>Join Code:</b> <code>{join_code}</code> (Port 2458)\n"
+            f"{conn_tg}\n"
             f"• <b>World Backup:</b> <code>{os.path.basename(backup_path or 'none')}</code>\n"
             f"• <b>Status:</b> Online &amp; Ready"
         )
@@ -625,7 +655,7 @@ def perform_patch(old_build: str, new_build: str, dry_run: bool = False) -> bool
             f"🛡️ *Valheim Server Auto-Patched!*\n\n"
             f"• *Build:* `{old_build}` ➔ `{new_build}`\n"
             f"• *Version:* `{version}`\n"
-            f"• *Join Code:* `{join_code}` (Port 2458)\n"
+            f"{conn_wa}\n"
             f"• *Status:* Online & Ready! ⚔️"
         )
         if notes and notes.get("wa_text"):
@@ -634,14 +664,14 @@ def perform_patch(old_build: str, new_build: str, dry_run: bool = False) -> bool
         if not dry_run:
             send_telegram(msg)
             send_whatsapp(wa_msg)
-            record_vps_log(f"Valheim Server: Auto-patched to Build {new_build} ({version}). Join code: {join_code}.")
+            record_vps_log(f"Valheim Server: Auto-patched to Build {new_build} ({version}). Connection: {join_code}.")
         else:
             log("[DRY RUN] Patch flow simulated successfully. No alerts broadcast.")
         return True
     else:
-        log("Server process is running but did not complete PlayFab registration within timeout.")
+        log("Server process is running but did not complete startup registration within timeout.")
         if not dry_run:
-            send_telegram(f"⚠️ <b>Valheim Auto-Patch Warning</b>\nServer updated to Build <code>{new_build}</code> but PlayFab registration is delayed.")
+            send_telegram(f"⚠️ <b>Valheim Auto-Patch Warning</b>\nServer updated to Build <code>{new_build}</code> but startup registration is delayed.")
         return False
 
 

@@ -97,7 +97,20 @@ def is_server_running():
     except Exception:
         return False
 
+def is_crossplay_configured():
+    start_script = "/root/valheim_server/start_valheim.sh"
+    try:
+        if os.path.exists(start_script):
+            with open(start_script, "r", encoding="utf-8", errors="ignore") as f:
+                return "-crossplay" in f.read()
+    except Exception:
+        pass
+    return False
+
+
 def get_active_join_code():
+    if not is_crossplay_configured():
+        return "Disabled"
     if not os.path.exists(LOG_FILE):
         return "Unknown"
     try:
@@ -494,42 +507,17 @@ PLAYER_CONTAINER_PREFABS = [
 PACKED_PLAYER_HASHES = [struct.pack('<i', get_stable_hash(p)) for p in PLAYER_CONTAINER_PREFABS]
 
 def scan_inventory_status():
-    totals = {}
-    container_count = 0
-    chunks = glob.glob('/root/.config/unity3d/IronGate/Valheim/worlds_local/Valheim10/*.chunk')
-    for c in chunks:
-        try:
-            with open(c, 'rb') as f:
-                data = f.read()
-            idx = 0
-            while True:
-                idx = data.find(TARGET_S_ITEMS, idx)
-                if idx == -1: break
-                p = idx + 4
-                if p + 4 > len(data): break
-                payload_len = struct.unpack('<I', data[p:p+4])[0]
-                p += 4
-                if p + payload_len <= len(data) and payload_len >= 6:
-                    payload = data[p:p+payload_len]
-                    version, count = struct.unpack('<IH', payload[:6])
-                    if version == 109 and count < 100:
-                        window = data[max(0, idx - 80):idx]
-                        if any(ph in window for ph in PACKED_PLAYER_HASHES):
-                            container_count += 1
-                            for i in range(6, payload_len - 5):
-                                cand_hash = struct.unpack('<i', payload[i+2:i+6])[0]
-                                if cand_hash in HASH_TO_ITEM:
-                                    stack = struct.unpack('<H', payload[i:i+2])[0]
-                                    if 1 <= stack <= 999:
-                                        k = HASH_TO_ITEM[cand_hash]
-                                        totals[k] = totals.get(k, 0) + stack
-                idx += 4
-        except Exception:
-            pass
+    from valheim_inventory import scan_world_inventory
+    totals, container_count = scan_world_inventory()
 
     top5 = []
-    for k, cnt in sorted(totals.items(), key=lambda x: x[1], reverse=True)[:5]:
-        top5.append((ITEM_CATALOG[k][0], cnt))
+    for k, cnt in sorted(totals.items(), key=lambda x: x[1], reverse=True):
+        if k in ITEM_CATALOG:
+            top5.append((ITEM_CATALOG[k][0], cnt))
+        else:
+            top5.append((k, cnt))
+        if len(top5) >= 5:
+            break
 
     metal_items = []
     cop = totals.get('Copper', 0)
@@ -596,10 +584,19 @@ def generate_chronicle(hours=24, save_story_to_master=False, dry_run=False):
         "",
         "🏰 *Realm Status*",
         f"• *Status:* {status_icon} {status_text}",
-        f"• *Join Code:* `{join_code}` | *Port:* `2458`",
-        "• *World:* `Valheim10` (Crossplay Active)",
-        ""
     ]
+    if join_code == "Disabled":
+        msg_lines.extend([
+            "• *Network:* Direct Steam Sockets (`72.62.227.29:2458`)",
+            "• *World:* `Valheim10` (Direct Steam)",
+            ""
+        ])
+    else:
+        msg_lines.extend([
+            f"• *Join Code:* `{join_code}` | *Port:* `2458`",
+            "• *World:* `Valheim10` (Crossplay Active)",
+            ""
+        ])
     
     # --- Raids & Sieges ---
     msg_lines.append("🛡️ *Raids & Sieges*")
@@ -922,7 +919,7 @@ def generate_chronicle(hours=24, save_story_to_master=False, dry_run=False):
             prog_info = get_progression_state()
             if prog_info.get("next_boss"):
                 nb = prog_info["next_boss"]
-                msg_lines.append(f"🎯 *Next Frontier:* Slay *{nb['name']}* in the *{prog_info['next_biome']}* (Check `!progress` or `!armourus` for prep)")
+                msg_lines.append(f"🎯 *Next Frontier:* Slay *{nb['name']}* in the *{nb['biome']}* (Check `!progress` or `!armourus` for prep)")
         except Exception:
             pass
     else:

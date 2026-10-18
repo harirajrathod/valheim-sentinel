@@ -101,28 +101,66 @@ def measure_relay_ping(host_or_ip: str = "20.74.234.90", timeout_sec: float = 0.
     return _PING_CACHE.measure(host_or_ip, timeout_sec)
 
 
+def is_crossplay_configured() -> bool:
+    """Checks whether -crossplay is present in start_valheim.sh."""
+    try:
+        start_script = os.path.join(VALHEIM_DIR, "start_valheim.sh")
+        if os.path.exists(start_script):
+            with open(start_script, "r", encoding="utf-8", errors="ignore") as f:
+                return "-crossplay" in f.read()
+    except Exception:
+        pass
+    return False
+
+
+def is_crossplay_active() -> bool:
+    """Checks whether the currently running Valheim server was launched with -crossplay."""
+    try:
+        res = subprocess.run(["pgrep", "-f", "valheim_server.x86_64"], capture_output=True, text=True)
+        pids = res.stdout.strip().split()
+        if pids:
+            with open(f"/proc/{pids[0]}/cmdline", "rb") as f:
+                cmd = f.read().decode('latin1', errors='ignore')
+                return "-crossplay" in cmd
+    except Exception:
+        pass
+    return is_crossplay_configured()
+
+
 def get_server_info() -> Dict[str, Any]:
     """
     Parses the active Valheim log to determine current status, players,
     session duration, and Azure relay connection.
     """
     running = is_server_running()
-    join_code = "Unknown"
+    crossplay_on = is_crossplay_active() if running else is_crossplay_configured()
+    join_code = "Unknown" if crossplay_on else "Disabled (Direct IP: 72.62.227.29:2458)"
     version = "1.0.12"
     active_players: Dict[str, str] = {}  # owner -> name
     sid_to_name: Dict[str, str] = {}
     player_load_times: Dict[str, datetime] = {}  # name -> datetime
-    relay_host = "20.74.234.90"
-    relay_region = "UAE North (PlayFab Azure)"
+    relay_host = "20.74.234.90" if crossplay_on else "Direct"
+    relay_region = "UAE North (PlayFab Azure)" if crossplay_on else "Direct Steam Sockets"
 
     if os.path.exists(LOG_FILE):
         try:
             with open(LOG_FILE, "r", errors="ignore") as f:
                 last_sid = None
                 for line in f:
-                    m_code = PATTERNS["join_code"].search(line) or PATTERNS["join_code_loose"].search(line)
-                    if m_code:
-                        join_code = m_code.group(1)
+                    if "Starting Valheim" in line or "Opened Steam server" in line:
+                        active_players.clear()
+                        sid_to_name.clear()
+                        player_load_times.clear()
+                        last_sid = None
+                        if not crossplay_on:
+                            join_code = "Disabled (Direct IP: 72.62.227.29:2458)"
+                            relay_host = "Direct"
+                            relay_region = "Direct Steam Sockets"
+
+                    if crossplay_on:
+                        m_code = PATTERNS["join_code"].search(line) or PATTERNS["join_code_loose"].search(line)
+                        if m_code:
+                            join_code = m_code.group(1)
                     if "Valheim" in line and "network version" in line:
                         m_ver = PATTERNS["version"].search(line)
                         if m_ver:
@@ -226,20 +264,43 @@ def get_server_info() -> Dict[str, Any]:
             })
 
     server_relay_ping_ms = None
-    if running:
+    if running and crossplay_on:
         relay_ping_data = measure_relay_ping(relay_host)
         server_relay_ping_ms = relay_ping_data.get("ping_ms")
-    else:
+    elif not running:
         players = []
         active_players = {}
         name_to_owner = {}
         player_sessions = []
         primary_zone_host = None
 
+    # Fetch Drive Backup metadata safely
+    drive_backup = {
+        "save_id": None,
+        "timestamp": None,
+        "status": "UNKNOWN",
+        "is_synced": False
+    }
+    try:
+        from valheim_backup_drive import load_drive_backup_state, get_active_save_info
+        b_state = load_drive_backup_state()
+        b_info = get_active_save_info()
+        drive_backup["save_id"] = b_state.get("last_save_id")
+        drive_backup["timestamp"] = b_state.get("last_backup_time")
+        drive_backup["status"] = b_state.get("last_status", "UNKNOWN")
+        drive_backup["is_synced"] = (
+            b_state.get("last_status") == "SUCCESS"
+            and b_state.get("last_save_id") is not None
+            and b_state.get("last_save_id") == b_info.get("save_id")
+        )
+    except Exception as e:
+        log_debug(f"Error fetching drive backup state: {e}")
+
     return {
         "running": running,
+        "crossplay": crossplay_on,
         "version": version,
-        "join_code": join_code,
+        "join_code": join_code if crossplay_on else "Disabled (Direct IP: 72.62.227.29:2458)",
         "player_count": len(players),
         "players": players,
         "owner_to_name": active_players,
@@ -248,8 +309,9 @@ def get_server_info() -> Dict[str, Any]:
         "player_sessions": player_sessions,
         "primary_zone_host": primary_zone_host,
         "server_relay_ping_ms": server_relay_ping_ms,
-        "relay_host": relay_host,
-        "relay_region": relay_region
+        "relay_host": relay_host if crossplay_on else "Direct",
+        "relay_region": relay_region if crossplay_on else "Direct Steam Sockets",
+        "drive_backup": drive_backup
     }
 
 
@@ -266,6 +328,7 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
             "dry_run": True,
             "simulated": True,
             "current_running": running,
+            "crossplay": info.get("crossplay", True),
             "join_code": info.get("join_code", "Unknown"),
             "version": info.get("version", "Unknown"),
             "port": 2458,
@@ -274,6 +337,7 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
         }
 
     start_time = time.time()
+    crossplay_will_run = is_crossplay_configured()
     stop_file = os.path.join(VALHEIM_DIR, ".stop_server")
     try:
         with open(stop_file, "w") as f:
@@ -329,9 +393,10 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
     if not is_server_running():
         return {"success": False, "error": "Server process failed to start."}
 
-    # Wait for PlayFab lobby registration & join code
+    # Wait for server initialization
     join_code = "Unknown"
     version = "Unknown"
+    server_connected = False
     while time.time() - start_time < timeout:
         if not is_server_running():
             return {"success": False, "error": "Server crashed during startup verification."}
@@ -349,10 +414,51 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
                         m_ver = re.search(r'Valheim version:\s+(.*)', line)
                         if m_ver:
                             version = m_ver.group(1)
+                    elif "Console: Valheim" in line and version == "Unknown":
+                        m_ver = re.search(r'Valheim\s+(l-[\d\.]+.*?\(network version \d+\))', line)
+                        if m_ver:
+                            version = m_ver.group(1)
+                    if "Game server connected" in line:
+                        server_connected = True
+
+                if crossplay_will_run:
                     if join_code != "Unknown":
+                        if not dry_run:
+                            try:
+                                from valheim_utils import safe_load_json, atomic_save_json, state_path
+                                pf_file = state_path("valheim_playfab_state.json")
+                                pf_state = safe_load_json(pf_file, default={})
+                                pf_state["desync_pending"] = False
+                                pf_state["last_restart_time"] = time.time()
+                                atomic_save_json(pf_file, pf_state)
+                            except Exception as ex_pf:
+                                log_debug(f"Warning updating playfab state on restart: {ex_pf}")
+
                         return {
                             "success": True,
+                            "crossplay": True,
                             "join_code": join_code,
+                            "version": version,
+                            "port": 2458,
+                            "duration_seconds": round(time.time() - start_time, 1)
+                        }
+                else:
+                    if server_connected:
+                        if not dry_run:
+                            try:
+                                from valheim_utils import safe_load_json, atomic_save_json, state_path
+                                pf_file = state_path("valheim_playfab_state.json")
+                                pf_state = safe_load_json(pf_file, default={})
+                                pf_state["desync_pending"] = False
+                                pf_state["last_restart_time"] = time.time()
+                                atomic_save_json(pf_file, pf_state)
+                            except Exception as ex_pf:
+                                log_debug(f"Warning updating playfab state on restart: {ex_pf}")
+
+                        return {
+                            "success": True,
+                            "crossplay": False,
+                            "join_code": "Disabled (Direct IP: 72.62.227.29:2458)",
                             "version": version,
                             "port": 2458,
                             "duration_seconds": round(time.time() - start_time, 1)
@@ -361,12 +467,25 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
                 pass
         time.sleep(3)
 
+    srv_ok = is_server_running()
+    if srv_ok and not dry_run:
+        try:
+            from valheim_utils import safe_load_json, atomic_save_json, state_path
+            pf_file = state_path("valheim_playfab_state.json")
+            pf_state = safe_load_json(pf_file, default={})
+            pf_state["desync_pending"] = False
+            pf_state["last_restart_time"] = time.time()
+            atomic_save_json(pf_file, pf_state)
+        except Exception as ex_pf:
+            log_debug(f"Warning updating playfab state on restart: {ex_pf}")
+
     return {
-        "success": is_server_running(),
-        "join_code": join_code,
+        "success": srv_ok,
+        "crossplay": crossplay_will_run,
+        "join_code": join_code if crossplay_will_run else "Disabled (Direct IP: 72.62.227.29:2458)",
         "version": version,
         "port": 2458,
-        "note": "PlayFab lobby registration took longer than expected but server is running."
+        "note": "Direct Steam Server running." if not crossplay_will_run else "PlayFab lobby registration took longer than expected but server is running."
     }
 
 

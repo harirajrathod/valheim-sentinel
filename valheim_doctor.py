@@ -106,8 +106,11 @@ class ValheimDoctor:
             try:
                 data = json.loads(out)
                 join_code = data.get("join_code", "")
+                crossplay = data.get("crossplay", True)
                 players = data.get("players", [])
-                if join_code and len(join_code) >= 6:
+                if not crossplay or "Disabled" in str(join_code):
+                    self.record(cat, "Network Runtime Mode", "PASS", f"Direct Steam Sockets (Crossplay Disabled, {len(players)} warriors online)", t)
+                elif join_code and len(join_code) >= 6:
                     self.record(cat, "PlayFab Join Code", "PASS", f"Active Join Code: `{join_code}` ({len(players)} warriors online)", t)
                 else:
                     self.record(cat, "PlayFab Join Code", "WARN", f"Unexpected Join Code format: '{join_code}'", t)
@@ -146,6 +149,20 @@ class ValheimDoctor:
         else:
             self.record(cat, "hermes-gateway.service", "FAIL", f"State: {out}", t)
 
+        # 8. Google Drive Backup Engine
+        try:
+            import valheim_backup_drive
+            b_info = valheim_backup_drive.get_active_save_info()
+            b_state = valheim_backup_drive.load_drive_backup_state()
+            last_sid = b_state.get("last_save_id")
+            last_st = b_state.get("last_status")
+            if last_st == "SUCCESS":
+                self.record(cat, "Google Drive Backup Engine", "PASS", f"Synced to save #{last_sid} (world: #{b_info.get('save_id')})", 0)
+            else:
+                self.record(cat, "Google Drive Backup Engine", "WARN", f"Status: {last_st}, last save: #{last_sid}", 0)
+        except Exception as e:
+            self.record(cat, "Google Drive Backup Engine", "FAIL", f"Error checking backup engine: {e}", 0)
+
     # =========================================================================
     # 2. CRON SCHEDULES & SCRIPT EXISTENCE
     # =========================================================================
@@ -181,6 +198,7 @@ class ValheimDoctor:
 
         scripts = [
             "/root/valheim_autopatch.py",
+            "/root/valheim_backup_drive.py",
             "/root/valheim_boss_helper.py",
             "/root/valheim_constants.py",
             "/root/valheim_daily_chronicle.py",
@@ -250,6 +268,7 @@ class ValheimDoctor:
             ("/root/valheim_traders_state.json", dict, "traders_state"),
             ("/root/valheim_voice_state.json", dict, "voice_state"),
             ("/root/valheim_world_day.json", dict, "world_day"),
+            ("/root/valheim_playfab_state.json", dict, "playfab_state"),
         ]
 
         for path, exp_type, label in stores:
@@ -295,6 +314,7 @@ class ValheimDoctor:
             ("!craft Iron Sword", ["/usr/bin/python3", "/root/valheim_qol.py", "--craft", "Iron Sword"], ["Iron Sword", "Recipe", "Craftable"]),
             ("!quests", ["/usr/bin/python3", "/root/valheim_quest_engine.py", "--list"], ["Clan Quest Board", "Great Hall"]),
             ("!sync", ["/usr/bin/python3", "/root/valheim_sync.py", "--check"], ["Traders Audited", "Stockpiles"]),
+            ("!backup", ["/usr/bin/python3", "/root/valheim_backup_drive.py", "--check"], ["Cloud Backup", "Google Drive", "Save"]),
         ]
 
         for cmd_name, cmd_args, expected_keywords in commands:
