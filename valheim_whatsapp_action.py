@@ -380,12 +380,8 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
     tmux_cmd = f"bash {start_script} >> {LOG_FILE} 2>&1"
     subprocess.run(["tmux", "new-session", "-d", "-s", TMUX_SESSION, tmux_cmd])
     try:
-        # Decouple process from caller cgroup
-        res_pid = subprocess.run(["pgrep", "-f", "valheim_server.x86_64"], capture_output=True, text=True)
-        for p in res_pid.stdout.strip().split():
-            if p:
-                with open("/sys/fs/cgroup/cgroup.procs", "w") as cg_f:
-                    cg_f.write(p + "\n")
+        from valheim_utils import decouple_valheim_cgroup
+        decouple_valheim_cgroup()
     except Exception:
         pass
     time.sleep(5)
@@ -406,8 +402,8 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
                 with open(LOG_FILE, "r", errors="ignore") as f:
                     lines = f.readlines()
                 for line in reversed(lines[-80:]):
-                    if "registered with join code" in line:
-                        m_code = re.search(r'join code\s+(\d+)', line)
+                    if "join code" in line:
+                        m_code = re.search(r'(?:registered with join code|Created new join code|with join code)\s+(\d+)', line)
                         if m_code:
                             join_code = m_code.group(1)
                     if "Valheim version:" in line:
@@ -554,6 +550,19 @@ def switch_crossplay(target_mode: str, dry_run: bool = False) -> Dict[str, Any]:
     active_cp = is_crossplay_active()
     cfg_cp = is_crossplay_configured()
 
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "already_set": False,
+            "crossplay": desired_crossplay,
+            "action": "enabled" if desired_crossplay else "disabled",
+            "join_code": "123456" if desired_crossplay else "Disabled (Direct IP: 72.62.227.29:2458)",
+            "port": 2458,
+            "duration_seconds": 0.0,
+            "note": f"[DRY RUN] Would switch crossplay to {desired_crossplay} and restart."
+        }
+
     # Check if already in requested state
     if desired_crossplay and active_cp and cfg_cp and running:
         info = get_server_info()
@@ -573,19 +582,6 @@ def switch_crossplay(target_mode: str, dry_run: bool = False) -> Dict[str, Any]:
             "join_code": "Disabled (Direct IP: 72.62.227.29:2458)",
             "port": 2458,
             "message": "Crossplay is already disabled."
-        }
-
-    if dry_run:
-        return {
-            "success": True,
-            "dry_run": True,
-            "already_set": False,
-            "crossplay": desired_crossplay,
-            "action": "enabled" if desired_crossplay else "disabled",
-            "join_code": "123456" if desired_crossplay else "Disabled (Direct IP: 72.62.227.29:2458)",
-            "port": 2458,
-            "duration_seconds": 0.0,
-            "note": f"[DRY RUN] Would switch crossplay to {desired_crossplay} and restart."
         }
 
     # 1. Update start_valheim.sh configuration

@@ -359,3 +359,27 @@ def get_valheim_player_count(log_file: str = LOG_FILE) -> int:
         pass
     return 0
 
+
+def decouple_valheim_cgroup() -> None:
+    """
+    Moves all Valheim server and tmux processes to the root cgroup (0::/).
+    This guarantees that service restarts (e.g., hermes-gateway.service, cron)
+    never kill or send SIGKILL to the Valheim server or tmux session.
+    """
+    try:
+        res = subprocess.run(
+            ["pgrep", "-f", "valheim_server.x86_64|start_valheim.sh|tmux.*valheim"],
+            capture_output=True,
+            text=True
+        )
+        pids = res.stdout.strip().split()
+        for p in pids:
+            if p:
+                try:
+                    with open("/sys/fs/cgroup/cgroup.procs", "w") as f:
+                        f.write(p + "\n")
+                except Exception:
+                    pass
+    except Exception:
+        pass
+

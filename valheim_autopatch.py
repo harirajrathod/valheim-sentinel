@@ -502,6 +502,11 @@ def start_server(dry_run: bool = False) -> bool:
     start_script = os.path.join(VALHEIM_DIR, "start_valheim.sh")
     tmux_cmd = f"bash {start_script} >> {LOG_FILE} 2>&1"
     subprocess.run(["tmux", "new-session", "-d", "-s", TMUX_SESSION, tmux_cmd])
+    try:
+        from valheim_utils import decouple_valheim_cgroup
+        decouple_valheim_cgroup()
+    except Exception:
+        pass
     time.sleep(5)
     return is_server_running()
 
@@ -567,8 +572,8 @@ def verify_and_get_info(timeout: int = 60, dry_run: bool = False) -> Tuple[bool,
                         m_ver = re.search(r'Valheim\s+(l-[\d\.]+.*?\(network version \d+\))', line)
                         if m_ver:
                             version = m_ver.group(1)
-                    if "registered with join code" in line:
-                        m_code = re.search(r'join code\s+(\d+)', line)
+                    if "join code" in line:
+                        m_code = re.search(r'(?:registered with join code|Created new join code|with join code)\s+(\d+)', line)
                         if m_code:
                             join_code = m_code.group(1)
                     if "Game server connected" in line:
