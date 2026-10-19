@@ -482,6 +482,20 @@ def format_raid_alert(raid_key: str, active_players: Set[str], join_code: str) -
     return f"{sentence_1}\n{sentence_2}"
 
 
+def format_casualties(sacrifices: List[str]) -> str:
+    counts = Counter(sacrifices)
+    total = len(sacrifices)
+    if total == 1:
+        victim = list(counts.keys())[0]
+        return f"1 casualty: *{format_player_name(victim)}*"
+    parts = []
+    for v, c in counts.most_common():
+        name = format_player_name(v)
+        parts.append(f"*{name}* ({c} falls)" if c > 1 else f"*{name}*")
+    joined = ", ".join(parts)
+    return f"{total} casualties: {joined}"
+
+
 def format_raid_victory_message(
     raid_key: str,
     defenders: Set[str],
@@ -490,36 +504,30 @@ def format_raid_victory_message(
 ) -> str:
     lore = RAID_LORE.get(raid_key, (f"Hostile creatures repelled ({raid_key})! ⚔️", "Enemy Invaders"))
     event_title, foes = lore
-    defenders_str = ", ".join(f"*{format_player_name(p)}*" for p in sorted(defenders)) if defenders else "Valiant Vikings"
+    clean_title = re.sub(r'[\s\.\!\?\-\:⚡🌲☣️❄️⚔️🔥🐺💀🧌🦇👻\U00010000-\U0010ffff]+$', '', event_title).strip()
+    host_label = foes if foes != "Enemy Invaders" else (clean_title or foes)
 
-    lines = [
-        "🛡️⚔️ *VICTORY IN VALHEIM! THE SIEGE IS BROKEN!* ⚔️🛡️",
-        "",
-        f"*{event_title}*",
-        f"• *Repelled Host:* {foes} (Vanquished)",
-        f"• *Stalwart Defenders:* {defenders_str}",
-    ]
+    dur_suffix = ""
     if duration_seconds:
         mins = duration_seconds // 60
         secs = duration_seconds % 60
-        dur_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
-        lines.append(f"• *Siege Duration:* {dur_str}")
+        dur_suffix = f" in {mins}m {secs}s" if mins > 0 else f" in {secs}s"
 
-    lines.append("")
-    if sacrifices:
-        counts = Counter(sacrifices)
-        lines.append("🩸 *SACRIFICES OF VALOR:*")
-        for victim, count in counts.most_common():
-            fall_str = f"{count} fall" if count == 1 else f"{count} falls"
-            lines.append(f"  💀 *{format_player_name(victim)}* ({fall_str})")
-        lines.append("_Their blood watered the sacred soil, but their courage held the shieldwall! Valhalla welcomes the brave!_ 🪓")
+    sentence_1 = f"🛡️⚔️ *VICTORY IN VALHEIM!* The siege is broken — {host_label} have been repelled{dur_suffix}!"
+
+    if defenders:
+        defenders_str = ", ".join(f"*{format_player_name(p)}*" for p in sorted(defenders))
+        if sacrifices:
+            sentence_2 = f"*Stalwart Defenders:* {defenders_str} held the shieldwall ({format_casualties(sacrifices)}) — Valhalla honors the brave! 🪓"
+        else:
+            sentence_2 = f"*Stalwart Defenders:* {defenders_str} — flawless defense with zero casualties! Skål! 🍻"
     else:
-        lines.append("🛡️ *SACRIFICES:*")
-        lines.append("  ✨ *FLAWLESS DEFENSE!* Zero casualties sustained! Not a single drop of Viking blood was spilled on the longhouse floor.")
+        if sacrifices:
+            sentence_2 = f"The shieldwall held ({format_casualties(sacrifices)}) — Valhalla honors the brave! 🪓"
+        else:
+            sentence_2 = "The longhouse stands secure with zero casualties sustained! Skål! 🍻"
 
-    lines.append("")
-    lines.append("The hearth fires burn bright and the longhouse stands secure. Odin nods in approval! Skål! 🍻🥩🔥")
-    return "\n".join(lines)
+    return f"{sentence_1}\n{sentence_2}"
 
 
 def format_raid_amendment_message(raid_key: str, fallen_warrior: str, all_sacrifices: List[str]) -> str:
@@ -528,20 +536,12 @@ def format_raid_amendment_message(raid_key: str, fallen_warrior: str, all_sacrif
     counts = Counter(all_sacrifices)
     fall_count = counts.get(fallen_warrior, 1)
     fall_str = f"{fall_count} fall" if fall_count == 1 else f"{fall_count} falls"
+    name = format_player_name(fallen_warrior)
 
-    lines = [
-        "🩸⚔️ *CASUALTY UPDATE — SANGUINE SHIELDWALL!* ⚔️🩸",
-        "",
-        f"*{event_title}*",
-        "Hold the toasts! Hostile stragglers ambushed the homestead during the final mop-up!",
-        f"💀 *{format_player_name(fallen_warrior)}* has fallen in battle! ({fall_str})",
-        "",
-        f"• *Enemy Host:* {foes}",
-        f"• *Total Casualties:* {len(all_sacrifices)} fallen",
-        "",
-        "_Their blood watered the sacred soil, but their courage held the shieldwall! Valhalla welcomes the brave!_ 🪓 Skål! 🍻🥩"
-    ]
-    return "\n".join(lines)
+    cas_summary = format_casualties(all_sacrifices)
+    sentence_1 = f"🩸⚔️ *CASUALTY UPDATE!* Hostile stragglers ambushed *{name}* ({fall_str}) during the final mop-up of {foes}!"
+    sentence_2 = f"Total raid toll: {cas_summary} — Valhalla welcomes the brave! 🪓 Skål! 🍻"
+    return f"{sentence_1}\n{sentence_2}"
 
 
 def format_boss_defeat_message(boss_key: str, active_players: Set[str]) -> str:
