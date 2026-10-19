@@ -77,7 +77,10 @@ RAID_LORE = {
     "foresttrolls": ("The ground is shaking... 🧌", "Trolls"),
     "surtlings": ("A smell of sulfur in the air... 🔥", "Surtlings"),
     "bats": ("You stirred the cauldron... 🦇", "Bat Swarm"),
-    "ghosts": ("A cold chill runs down your spine... 👻", "Spectres & Wraiths")
+    "ghosts": ("A cold chill runs down your spine... 👻", "Spectres & Wraiths"),
+    "hildirboss1": ("Brenna's cultists approach... 🔥", "Skeleton & Brenna Invaders"),
+    "hildirboss2": ("Geirrhafa's frost pack approaches... ❄️", "Fenring & Geirrhafa Pack"),
+    "hildirboss3": ("Zil & Thungr's horde approaches... 🧌", "Goblin Brutes & Shaman")
 }
 
 RAID_SPAWN_DURATIONS = {
@@ -95,7 +98,10 @@ RAID_SPAWN_DURATIONS = {
     "foresttrolls": 80,
     "surtlings": 120,
     "bats": 120,
-    "ghosts": 120
+    "ghosts": 120,
+    "hildirboss1": 120,
+    "hildirboss2": 120,
+    "hildirboss3": 120
 }
 RAID_DURATIONS = RAID_SPAWN_DURATIONS
 MOPUP_BUFFER = 120
@@ -454,22 +460,26 @@ def record_death(player_name: str, line: str, active_raid: Optional[Dict[str, An
 def format_raid_alert(raid_key: str, active_players: Set[str], join_code: str) -> str:
     lore = RAID_LORE.get(raid_key, (f"Hostile creatures approach ({raid_key})! ⚔️", "Enemy Invaders"))
     event_title, foes = lore
+    clean_title = re.sub(r'[\s\.\!\?\-\:⚡🌲☣️❄️⚔️🔥🐺💀🧌🦇👻\U00010000-\U0010ffff]+$', '', event_title).strip()
+    if not clean_title:
+        clean_title = event_title.strip()
+
     if active_players:
         defenders_str = ", ".join(f"*{format_player_name(p)}*" for p in sorted(active_players))
+        sentence_2 = f"*Active Defenders:* {defenders_str} — rally to the shieldwall! ⚔️"
     else:
-        defenders_str = "_No warriors currently online! The longhouse is unprotected!_"
+        sentence_2 = "The longhouse is unprotected with zero warriors online — draw steel and rally to the shieldwall! ⚔️"
 
-    lines = [
-        "📯💥 *HORN OF WAR! HOMESTEAD UNDER SIEGE!* 💥📯",
-        "",
-        f"*{event_title}*",
-        f"• *Enemy Host:* {foes}",
-        f"• *Active Defenders:* {defenders_str}",
-        "",
-        f"⚔️ *Rally to the Shieldwall!* Join Code: `{join_code}`",
-        "Draw steel and protect the hearth!"
-    ]
-    return "\n".join(lines)
+    # Connection endpoint: show Join Code if digits, else Direct Steam Sockets IP
+    if join_code and re.match(r'^\d+$', str(join_code).strip()):
+        conn_str = f"(Join Code: `{join_code.strip()}`)"
+    else:
+        conn_str = "(Direct IP: `72.62.227.29:2458`)"
+
+    sentence_1 = f"📯💥 *HORN OF WAR!* *{clean_title}* — {foes} have besieged the homestead!"
+    sentence_2 = f"{sentence_2} {conn_str}"
+
+    return f"{sentence_1}\n{sentence_2}"
 
 
 def format_raid_victory_message(

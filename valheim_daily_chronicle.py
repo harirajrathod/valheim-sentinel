@@ -49,7 +49,10 @@ RAID_LORE = {
     "foresttrolls": ("The ground is shaking... 🧌", "Trolls"),
     "surtlings": ("A smell of sulfur in the air... 🔥", "Surtlings"),
     "bats": ("You stirred the cauldron... 🦇", "Bat Swarm"),
-    "ghosts": ("A cold chill runs down your spine... 👻", "Spectres & Wraiths")
+    "ghosts": ("A cold chill runs down your spine... 👻", "Spectres & Wraiths"),
+    "hildirboss1": ("Brenna's cultists approach... 🔥", "Skeleton & Brenna Invaders"),
+    "hildirboss2": ("Geirrhafa's frost pack approaches... ❄️", "Fenring & Geirrhafa Pack"),
+    "hildirboss3": ("Zil & Thungr's horde approaches... 🧌", "Goblin Brutes & Shaman")
 }
 
 LOCATION_DEFS = [
