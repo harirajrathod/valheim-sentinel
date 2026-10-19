@@ -19,7 +19,7 @@ import base64
 import subprocess
 import argparse
 from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
@@ -489,14 +489,178 @@ def graceful_restart(timeout: int = 90, dry_run: bool = False) -> Dict[str, Any]
     }
 
 
+def set_crossplay_configuration(enable: bool, start_script_path: Optional[str] = None) -> bool:
+    """
+    Atomically updates start_valheim.sh to append or remove -crossplay.
+    """
+    script_path = start_script_path or os.path.join(VALHEIM_DIR, "start_valheim.sh")
+    if not os.path.exists(script_path):
+        log_debug(f"start_valheim.sh not found at {script_path}")
+        return False
+
+    try:
+        with open(script_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+
+        has_crossplay = bool(re.search(r'\s+-crossplay\b', content))
+        if enable and not has_crossplay:
+            content = re.sub(
+                r'(\./valheim_server\.x86_64\s+[^\n]+)',
+                lambda m: m.group(1).rstrip() + " -crossplay",
+                content
+            )
+        elif not enable and has_crossplay:
+            content = re.sub(r'\s+-crossplay\b', '', content)
+
+        temp_path = script_path + ".tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.chmod(temp_path, 0o755)
+        os.replace(temp_path, script_path)
+        log_debug(f"Crossplay configuration updated (enable={enable}) in {script_path}")
+        return True
+    except Exception as e:
+        log_debug(f"Error updating crossplay in {script_path}: {e}")
+        return False
+
+
+def switch_crossplay(target_mode: str, dry_run: bool = False) -> Dict[str, Any]:
+    """
+    Switches the Valheim server's crossplay capability on or off.
+    Gracefully saves world and restarts server to apply mode changes.
+    """
+    norm_mode = (target_mode or "status").lower().strip()
+    if norm_mode in ("on", "enable", "enabled", "1", "true"):
+        desired_crossplay = True
+    elif norm_mode in ("off", "disable", "disabled", "0", "false"):
+        desired_crossplay = False
+    elif norm_mode in ("status", "check", "query"):
+        info = get_server_info()
+        return {
+            "success": True,
+            "status_only": True,
+            "crossplay": info.get("crossplay", False),
+            "join_code": info.get("join_code", "Unknown"),
+            "port": 2458,
+            "mode": "Crossplay (PlayFab Relay)" if info.get("crossplay") else "Direct Steam Sockets"
+        }
+    else:
+        return {
+            "success": False,
+            "error": f"Invalid crossplay mode '{target_mode}'. Use 'on' or 'off'."
+        }
+
+    running = is_server_running()
+    active_cp = is_crossplay_active()
+    cfg_cp = is_crossplay_configured()
+
+    # Check if already in requested state
+    if desired_crossplay and active_cp and cfg_cp and running:
+        info = get_server_info()
+        return {
+            "success": True,
+            "already_set": True,
+            "crossplay": True,
+            "join_code": info.get("join_code", "Unknown"),
+            "port": 2458,
+            "message": "Crossplay is already enabled and active."
+        }
+    elif not desired_crossplay and not active_cp and not cfg_cp and running:
+        return {
+            "success": True,
+            "already_set": True,
+            "crossplay": False,
+            "join_code": "Disabled (Direct IP: 72.62.227.29:2458)",
+            "port": 2458,
+            "message": "Crossplay is already disabled."
+        }
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "already_set": False,
+            "crossplay": desired_crossplay,
+            "action": "enabled" if desired_crossplay else "disabled",
+            "join_code": "123456" if desired_crossplay else "Disabled (Direct IP: 72.62.227.29:2458)",
+            "port": 2458,
+            "duration_seconds": 0.0,
+            "note": f"[DRY RUN] Would switch crossplay to {desired_crossplay} and restart."
+        }
+
+    # 1. Update start_valheim.sh configuration
+    if not set_crossplay_configuration(desired_crossplay):
+        return {
+            "success": False,
+            "error": "Failed to update start_valheim.sh script."
+        }
+
+    # Also keep sentinel repo in sync if it exists
+    sentinel_script = "/root/valheim-sentinel/scripts/start_valheim.sh"
+    if os.path.exists(sentinel_script):
+        set_crossplay_configuration(desired_crossplay, start_script_path=sentinel_script)
+
+    # 2. Perform graceful restart to apply changes
+    restart_res = graceful_restart(timeout=100, dry_run=False)
+
+    if not restart_res.get("success", False):
+        return {
+            "success": False,
+            "error": restart_res.get("error", "Restart failed while applying crossplay mode change."),
+            "crossplay": desired_crossplay
+        }
+
+    # Trigger Drive backup snapshot
+    try:
+        from valheim_backup_drive import trigger_drive_backup_async
+        trigger_drive_backup_async(trigger="crossplay_switch", create_snapshot=True)
+    except Exception as ex_b:
+        log_debug(f"Warning triggering backup on crossplay switch: {ex_b}")
+
+    # Notify Telegram
+    try:
+        from valheim_utils import safe_send_telegram
+        if desired_crossplay:
+            tg_text = (
+                f"🛡️ <b>Valheim Crossplay</b>: Enabled 🌐\n"
+                f"• Join Code: <code>{restart_res.get('join_code', 'Unknown')}</code>\n"
+                f"• Port: <code>2458</code>\n"
+                f"• Mode: <b>Microsoft PlayFab Relay</b>"
+            )
+        else:
+            tg_text = (
+                f"🛡️ <b>Valheim Crossplay</b>: Disabled 🚀\n"
+                f"• Mode: <b>Direct Steam Sockets</b>\n"
+                f"• Direct IP: <code>72.62.227.29:2458</code>"
+            )
+        safe_send_telegram(tg_text)
+    except Exception as ex_tg:
+        log_debug(f"Warning sending Telegram alert: {ex_tg}")
+
+    return {
+        "success": True,
+        "already_set": False,
+        "crossplay": desired_crossplay,
+        "action": "enabled" if desired_crossplay else "disabled",
+        "join_code": restart_res.get("join_code", "Unknown"),
+        "port": 2458,
+        "version": restart_res.get("version", "Unknown"),
+        "duration_seconds": restart_res.get("duration_seconds", 0.0)
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Safe Valheim actions for WhatsApp integration")
     parser.add_argument("--status", action="store_true", help="Return current server status as JSON")
     parser.add_argument("--restart", action="store_true", help="Gracefully restart the server")
+    parser.add_argument("--switch-crossplay", nargs="?", const="status", help="Switch crossplay on or off ('on', 'off', 'status')")
+    parser.add_argument("--crossplay", dest="switch_crossplay", nargs="?", const="status", help="Alias for --switch-crossplay")
     parser.add_argument("--dry-run", action="store_true", help="Perform inspection without mutating server state")
     args = parser.parse_args()
 
-    if args.restart:
+    if args.switch_crossplay:
+        result = switch_crossplay(args.switch_crossplay, dry_run=args.dry_run)
+    elif args.restart:
         result = graceful_restart(dry_run=args.dry_run)
     else:
         result = get_server_info()
